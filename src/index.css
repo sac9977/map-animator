@@ -1,0 +1,103 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  }
+  
+  .font-mono-numbers {
+    font-family: 'JetBrains Mono', monospace;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* Custom sleek scrollbar matching safari explorer aesthetic */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(230, 225, 215, 0.5);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(14, 100, 102, 0.3);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(14, 100, 102, 0.6);
+}
+
+/* Leaflet map custom clean styling */
+.leaflet-container {
+  font-family: inherit;
+  background-color: #E2DBD0;
+  width: 100%;
+  height: 100%;
+}
+
+.leaflet-control-zoom {
+  border: none !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.1) !important;
+  border-radius: 12px !important;
+  overflow: hidden;
+}
+
+.leaflet-control-zoom-in,
+.leaflet-control-zoom-out {
+  background-color: #FFFFFF !important;
+  color: #0E6466 !important;
+  border-bottom: 1px solid #F1ECE4 !important;
+  font-size: 16px !important;
+  width: 34px !important;
+  height: 34px !important;
+  line-height: 34px !important;
+}
+
+.leaflet-control-zoom-in:hover,
+.leaflet-control-zoom-out:hover {
+  background-color: #FAF8F5 !important;
+  color: #094749 !important;
+}
+
+.leaflet-control-attribution {
+  background: rgba(244, 241, 234, 0.85) !important;
+  backdrop-filter: blur(4px);
+  color: #64748B !important;
+  font-size: 10px !important;
+  padding: 2px 8px !important;
+  border-radius: 6px 0 0 0 !important;
+}
+
+.leaflet-control-attribution a {
+  color: #0E6466 !important;
+  text-decoration: none !important;
+}
+
+/* High-Contrast Cinematic Voyager Leaflet Theme */
+.leaflet-cinematic-sat-pane {
+  filter: brightness(0.94) contrast(1.26) saturate(0.82) sepia(0.18) hue-rotate(-8deg);
+}
+
+.leaflet-cinematic-hillshade-pane {
+  mix-blend-mode: multiply;
+  opacity: 0.68;
+  filter: contrast(1.45) brightness(1.08);
+}
+
+.leaflet-cinematic-labels-pane {
+  filter: contrast(1.3) drop-shadow(0 1px 2px rgba(14, 100, 102, 0.4));
+}
+
+.leaflet-cinematic-overlay-tint {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 450;
+  background: radial-gradient(circle at 50% 50%, rgba(226, 219, 208, 0.08) 0%, rgba(14, 100, 102, 0.14) 100%);
+  mix-blend-mode: color;
+}
+

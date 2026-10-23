@@ -1,0 +1,6 @@
+{
+  "name": "MapAnimator - Explorer Edition",
+  "description": "Desktop-grade travel route video animator with OpenStreetMap cartography, real OSRM road routing, flight geodesic tracking, off-road trek GPX & spline pathing, and 4K video rendering.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
