@@ -32,6 +32,7 @@ export interface TrekConfiguration {
   elevationProfile?: { distanceKm: number; elevationMeters: number }[];
   totalDistanceKm?: number;
   elevationGainMeters?: number;
+  elevationLossMeters?: number;
   minElevation?: number;
   maxElevation?: number;
   pointCount?: number;
@@ -60,6 +61,7 @@ export interface JourneyLeg {
   cachedPath: [number, number][]; // [lat, lng] array
   trekConfig?: TrekConfiguration;
   flightInfo?: FlightInfo;
+  customIconId?: string; // Specific modern icon ID chosen by user
 }
 
 export type MapTileStyle = 'cinematic-voyager' | 'osm' | 'opentopomap' | 'outdoor' | 'satellite';

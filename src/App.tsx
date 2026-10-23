@@ -12,6 +12,7 @@ import { TimelineController } from './components/TimelineController';
 import { ExportModal } from './components/ExportModal';
 import { PresetsModal } from './components/PresetsModal';
 import { WeatherOverlay } from './components/WeatherOverlay';
+import { ElevationProfileViewer } from './components/ElevationProfileViewer';
 import { JourneyLeg, Waypoint } from './types/travel';
 import { PRESET_JOURNEYS, JourneyPreset } from './data/presetJourneys';
 import { calculateCatmullRomSpline, fetchRoadRoute } from './utils/geoRouting';
@@ -332,22 +333,41 @@ export default function App() {
           isPickingLocation={isPickingLocation}
         />
 
-        {/* Central Map & Animation Viewport */}
-        <MapViewport
-          homeBase={homeBase}
-          legs={legs}
-          activeLegIndex={activeLegIndex}
-          legProgress={legProgress}
-          currentTimeMs={currentTimeMs}
-          autoZoom={autoZoom}
-          fitBoundsTrigger={fitBoundsTrigger}
-          isPickingLocation={isPickingLocation}
-          onLocationPicked={handleLocationPicked}
-          isDrawingTrekForLegIndex={isDrawingTrekForLegIndex}
-          onTrekPointAdded={handleTrekPointAdded}
-          onFinishDrawingTrek={handleFinishDrawingTrek}
-          onOpenWeather={() => setIsWeatherOpen(true)}
-        />
+        {/* Central Map & Elevation Area */}
+        <div className="flex-1 flex flex-col h-full min-w-0 overflow-hidden relative">
+          <div className="flex-1 relative min-h-0">
+            <MapViewport
+              homeBase={homeBase}
+              legs={legs}
+              activeLegIndex={activeLegIndex}
+              legProgress={legProgress}
+              currentTimeMs={currentTimeMs}
+              autoZoom={autoZoom}
+              fitBoundsTrigger={fitBoundsTrigger}
+              isPickingLocation={isPickingLocation}
+              onLocationPicked={handleLocationPicked}
+              isDrawingTrekForLegIndex={isDrawingTrekForLegIndex}
+              onTrekPointAdded={handleTrekPointAdded}
+              onFinishDrawingTrek={handleFinishDrawingTrek}
+              onOpenWeather={() => setIsWeatherOpen(true)}
+            />
+          </div>
+
+          {/* Elevation Profile Viewer displayed below the map */}
+          <ElevationProfileViewer
+            legs={legs}
+            activeLegIndex={activeLegIndex}
+            legProgress={legProgress}
+            onSeekLegProgress={(prog) => {
+              setLegProgress(prog);
+            }}
+            onSelectLeg={(idx) => {
+              setActiveLegIndex(idx);
+              setLegProgress(0);
+            }}
+            onUpdateLeg={handleUpdateLeg}
+          />
+        </div>
       </div>
 
       {/* Bottom Timeline Scrubber & Speed Controls */}

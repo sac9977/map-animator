@@ -5,6 +5,7 @@ import { JourneyLeg, MapTileStyle, Waypoint } from '../types/travel';
 import { drawAnimatedVehicle } from '../utils/vehicleDrawers';
 import { calculateBearing, toRad } from '../utils/geoRouting';
 import { MapLayer } from './MapLayer';
+import { hexToRgba, getDefaultTrailColorForMode } from '../data/trailStyles';
 
 interface MapViewportProps {
   homeBase: Waypoint;
@@ -109,10 +110,23 @@ export const MapViewport: React.FC<MapViewportProps> = ({
     map.on('move', () => drawOverlayRef.current());
     map.on('resize', () => drawOverlayRef.current());
 
+    // Observe container resizing (e.g. when elevation viewer expands/collapses)
+    let resizeObserver: ResizeObserver | null = null;
+    if (mapContainerRef.current && typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(() => {
+        if (mapRef.current) {
+          mapRef.current.invalidateSize({ animate: false });
+          drawOverlayRef.current();
+        }
+      });
+      resizeObserver.observe(mapContainerRef.current);
+    }
+
     mapRef.current = map;
     setMapInstance(map);
 
     return () => {
+      if (resizeObserver) resizeObserver.disconnect();
       if (interactionTimeoutRef.current) window.clearTimeout(interactionTimeoutRef.current);
       map.remove();
       mapRef.current = null;
@@ -256,45 +270,65 @@ export const MapViewport: React.FC<MapViewportProps> = ({
       const isFuture = idx > activeLegIndex;
 
       // Draw route line
-      ctx.save();
+      const trailColor = leg.trailColor || getDefaultTrailColorForMode(leg.mode);
       const points = leg.cachedPath.map(coord => map.latLngToContainerPoint(coord));
 
-      if (leg.mode === 'flight') {
-        // Flight Great-Circle Arc styling
-        ctx.strokeStyle = isPast
-          ? 'rgba(56, 189, 248, 0.45)'
-          : isActive
-          ? 'rgba(56, 189, 248, 0.95)'
-          : 'rgba(148, 163, 184, 0.25)';
-        ctx.lineWidth = 3.5;
-        ctx.setLineDash([8, 6]);
-      } else if (leg.mode === 'hike') {
-        // Dotted Safari / Mountain Trek styling (matching user design cue)
-        ctx.strokeStyle = isPast
-          ? 'rgba(217, 119, 6, 0.5)'
-          : isActive
-          ? '#F59E0B'
-          : 'rgba(217, 119, 6, 0.25)';
-        ctx.lineWidth = 4;
-        ctx.setLineDash([4, 6]);
-      } else {
-        // Road / Sea styling
-        ctx.strokeStyle = isPast
-          ? 'rgba(14, 100, 102, 0.5)'
-          : isActive
-          ? leg.trailColor
-          : 'rgba(148, 163, 184, 0.25)';
-        ctx.lineWidth = 4.5;
-        ctx.setLineDash([]);
-      }
-
-      ctx.beginPath();
       const count = isActive
         ? Math.max(2, Math.floor(points.length * legProgress))
         : isPast
         ? points.length
         : points.length;
 
+      // Soft ambient glow / casing under active trail line for crisp legibility
+      if (isActive && leg.showTrail !== false) {
+        ctx.save();
+        ctx.strokeStyle = hexToRgba(trailColor, 0.28);
+        ctx.lineWidth = (leg.mode === 'flight' ? 3.5 : 4.5) + 4;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.beginPath();
+        points.slice(0, count).forEach((pt, i) => {
+          if (i === 0) ctx.moveTo(pt.x, pt.y);
+          else ctx.lineTo(pt.x, pt.y);
+        });
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      ctx.save();
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+
+      if (leg.mode === 'flight') {
+        // Flight Great-Circle Arc styling
+        ctx.strokeStyle = isPast
+          ? hexToRgba(trailColor, 0.45)
+          : isActive
+          ? hexToRgba(trailColor, 0.95)
+          : 'rgba(148, 163, 184, 0.25)';
+        ctx.lineWidth = 3.5;
+        ctx.setLineDash([8, 6]);
+      } else if (leg.mode === 'hike') {
+        // Dotted Safari / Mountain Trek styling
+        ctx.strokeStyle = isPast
+          ? hexToRgba(trailColor, 0.5)
+          : isActive
+          ? trailColor
+          : 'rgba(148, 163, 184, 0.25)';
+        ctx.lineWidth = 4;
+        ctx.setLineDash([4, 6]);
+      } else {
+        // Road / Sea styling
+        ctx.strokeStyle = isPast
+          ? hexToRgba(trailColor, 0.5)
+          : isActive
+          ? trailColor
+          : 'rgba(148, 163, 184, 0.25)';
+        ctx.lineWidth = 4.5;
+        ctx.setLineDash([]);
+      }
+
+      ctx.beginPath();
       points.slice(0, count).forEach((pt, i) => {
         if (i === 0) ctx.moveTo(pt.x, pt.y);
         else ctx.lineTo(pt.x, pt.y);
@@ -330,8 +364,15 @@ export const MapViewport: React.FC<MapViewportProps> = ({
         const angleRad = toRad(bearing - 90); // Canvas 0 rad is along positive X-axis
 
         // Flight altitude parabolic curve
+        const isAviation =
+          activeLeg.mode === 'flight' ||
+          (activeLeg.customIconId &&
+            (activeLeg.customIconId.startsWith('plane-') ||
+              activeLeg.customIconId === 'helicopter' ||
+              activeLeg.customIconId === 'hot-air-balloon'));
+
         let altitudeRatio = 0;
-        if (activeLeg.mode === 'flight') {
+        if (isAviation) {
           altitudeRatio = Math.sin(legProgress * Math.PI);
         }
 
@@ -341,6 +382,7 @@ export const MapViewport: React.FC<MapViewportProps> = ({
           y: currentPx.y,
           angleRad,
           mode: activeLeg.mode,
+          iconId: activeLeg.customIconId,
           color: activeLeg.vehicleColor,
           scale: activeLeg.vehicleScale,
           altitudeRatio,

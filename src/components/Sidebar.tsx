@@ -23,6 +23,9 @@ import {
   TrendingUp,
   CheckCircle2,
   Compass,
+  Eye,
+  EyeOff,
+  Palette,
 } from 'lucide-react';
 import { JourneyLeg, TransportMode, Waypoint } from '../types/travel';
 import { searchAirports } from '../data/airports';
@@ -36,6 +39,9 @@ import {
   ParsedGPXResult,
 } from '../utils/geoRouting';
 import { SAMPLE_GPX_TRACKS, SampleGPXTrack } from '../data/sampleGPX';
+import { IconPickerModal } from './IconPickerModal';
+import { getIconDefinition, getDefaultIconIdForMode } from '../data/travelerIcons';
+import { TRAIL_COLOR_PRESETS, hexToRgba, getDefaultTrailColorForMode } from '../data/trailStyles';
 
 interface SidebarProps {
   homeBase: Waypoint;
@@ -112,7 +118,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [destResults, setDestResults] = useState<Waypoint[]>([]);
   const [isSearchingDest, setIsSearchingDest] = useState(false);
   const [newLegMode, setNewLegMode] = useState<TransportMode>('suv');
+  const [newLegIconId, setNewLegIconId] = useState<string>('suv-expedition');
+  const [newLegVehicleColor, setNewLegVehicleColor] = useState<string>('#0E6466');
+  const [newLegTrailColor, setNewLegTrailColor] = useState<string>('#F59E0B');
   const [isCalculatingRoute, setIsCalculatingRoute] = useState(false);
+  const [iconPickerLegIndex, setIconPickerLegIndex] = useState<number | 'new' | null>(null);
 
   // Auto-focus destination search input when leg creator opens
   useEffect(() => {
@@ -195,8 +205,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
       path = await fetchRoadRoute(lastPoint, destination);
     }
 
-    const defaultColor =
-      newLegMode === 'flight' ? '#38BDF8' : newLegMode === 'hike' ? '#D97706' : newLegMode === 'boat' ? '#06B6D4' : '#0E6466';
+    const fallbackVehicleColor =
+      newLegMode === 'flight' ? '#F59E0B' : newLegMode === 'hike' ? '#D97706' : newLegMode === 'boat' ? '#06B6D4' : '#0E6466';
 
     const newLeg: JourneyLeg = {
       id: `leg-${Date.now()}`,
@@ -204,10 +214,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
       to: destination,
       mode: newLegMode,
       label: `${newLegMode.toUpperCase()} to ${destination.name}`,
-      vehicleColor: defaultColor,
+      vehicleColor: newLegVehicleColor || fallbackVehicleColor,
       vehicleScale: 1.1,
       showTrail: true,
-      trailColor: defaultColor,
+      trailColor: newLegTrailColor || getDefaultTrailColorForMode(newLegMode),
       durationSeconds: 7,
       pauseAtDestinationSeconds: 2.5,
       cachedPath: path,
@@ -216,6 +226,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         trailPattern: 'bootprints',
         splineTension: 0.5,
       } : undefined,
+      customIconId: newLegIconId,
     };
 
     onAddLeg(newLeg);
@@ -260,6 +271,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       trailPattern: 'bootprints' as const,
       totalDistanceKm: parsed.totalDistanceKm,
       elevationGainMeters: parsed.elevationGainMeters,
+      elevationLossMeters: parsed.elevationLossMeters,
       minElevation: parsed.minElevation,
       maxElevation: parsed.maxElevation,
       pointCount: parsed.pointCount,
@@ -292,6 +304,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         pauseAtDestinationSeconds: 3,
         cachedPath: path,
         trekConfig,
+        customIconId: 'hiker-modern',
       };
       onAddLeg(newLeg);
       onSelectLeg(legs.length);
@@ -360,6 +373,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       mode,
       cachedPath: newPath,
       label: `${mode.toUpperCase()} to ${leg.to.name}`,
+      customIconId: getDefaultIconIdForMode(mode),
     });
   };
 
@@ -604,7 +618,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 {TRANSPORT_MODES.slice(0, 5).map(({ mode, icon: Icon, label }) => (
                   <button
                     key={mode}
-                    onClick={() => setNewLegMode(mode)}
+                    onClick={() => {
+                      setNewLegMode(mode);
+                      setNewLegIconId(getDefaultIconIdForMode(mode));
+                    }}
                     className={`flex flex-col items-center justify-center py-1.5 rounded-lg text-[10px] font-medium transition-all ${
                       newLegMode === mode
                         ? 'bg-[#0E6466] text-white shadow-xs'
@@ -616,12 +633,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   </button>
                 ))}
               </div>
-              <div className="grid grid-cols-4 gap-1 p-1 bg-stone-100 rounded-xl">
+              <div className="grid grid-cols-4 gap-1 p-1 bg-stone-100 rounded-xl mb-2">
                 {TRANSPORT_MODES.slice(5).map(({ mode, icon: Icon, label }) => (
                   <button
                     key={mode}
-                    onClick={() => setNewLegMode(mode)}
-                    className={`flex flex-col items-center justify-center py-1.5 rounded-lg text-[10px] font-medium transition-all ${
+                    onClick={() => {
+                      setNewLegMode(mode);
+                      setNewLegIconId(getDefaultIconIdForMode(mode));
+                    }}
+                    className={`flex flex-col items-center justify-center py-1 rounded-lg text-[10px] font-medium transition-all ${
                       newLegMode === mode
                         ? 'bg-[#0E6466] text-white shadow-xs'
                         : 'text-stone-600 hover:text-stone-900 hover:bg-white/50'
@@ -632,6 +652,68 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   </button>
                 ))}
               </div>
+
+              {/* Active Vehicle & Trail Style for this new leg */}
+              {(() => {
+                const iconDef = getIconDefinition(newLegIconId, newLegMode);
+                return (
+                  <div className="p-2.5 rounded-xl bg-stone-50 border border-stone-200 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-lg bg-white border border-stone-200 shadow-2xs flex items-center justify-center shrink-0">
+                          {iconDef.renderSvg({ size: 22, color: newLegVehicleColor, className: 'w-5 h-5' })}
+                        </div>
+                        <div className="text-left min-w-0">
+                          <span className="text-[11px] font-bold text-stone-800 block leading-tight truncate">
+                            {iconDef.name}
+                          </span>
+                          <span className="text-[10px] text-stone-400">
+                            {iconDef.badge} · Custom Map Icon
+                          </span>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setIconPickerLegIndex('new')}
+                        className="text-[10px] font-semibold text-[#0E6466] bg-white hover:bg-[#0E6466]/5 px-2 py-0.5 rounded-md border border-stone-200 shadow-2xs transition-all shrink-0 ml-1"
+                      >
+                        Change Icon & Colors
+                      </button>
+                    </div>
+
+                    {/* Quick Trail Color for new leg */}
+                    <div className="pt-1.5 border-t border-stone-200/60 flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-1.5">
+                        <Route className="w-3 h-3 text-[#0E6466]" />
+                        <span className="text-[10px] uppercase font-bold text-stone-500">Trail:</span>
+                        <div className="flex items-center gap-1">
+                          {TRAIL_COLOR_PRESETS.slice(0, 5).map((p) => (
+                            <button
+                              key={p.hex}
+                              type="button"
+                              onClick={() => setNewLegTrailColor(p.hex)}
+                              style={{ backgroundColor: p.hex }}
+                              title={p.name}
+                              className={`w-3.5 h-3.5 rounded-full border transition-transform ${
+                                newLegTrailColor === p.hex ? 'scale-125 border-stone-900 ring-1 ring-[#0E6466]/40' : 'border-stone-300'
+                              }`}
+                            />
+                          ))}
+                          <label className="relative w-3.5 h-3.5 rounded-full border border-stone-300 flex items-center justify-center cursor-pointer overflow-hidden bg-gradient-to-tr from-cyan-400 via-amber-400 to-indigo-500" title="Custom Trail Color">
+                            <input
+                              type="color"
+                              value={newLegTrailColor}
+                              onChange={(e) => setNewLegTrailColor(e.target.value)}
+                              className="opacity-0 absolute inset-0 cursor-pointer w-full h-full"
+                            />
+                          </label>
+                        </div>
+                      </div>
+                      <span className="font-mono text-[9px] text-stone-400">{newLegTrailColor}</span>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Destination Search Box */}
@@ -837,6 +919,47 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 ))}
               </div>
 
+              {/* Modern Vehicle / Traveler Icon Selector */}
+              {(() => {
+                const iconDef = getIconDefinition(leg.customIconId, leg.mode);
+                return (
+                  <div
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIconPickerLegIndex(index);
+                    }}
+                    className="mb-3 p-2 rounded-xl bg-stone-50 hover:bg-[#0E6466]/5 border border-stone-200 hover:border-[#0E6466] transition-all flex items-center justify-between cursor-pointer group"
+                    title="Click to change vehicle or traveler icon"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="w-8 h-8 rounded-lg flex items-center justify-center border border-stone-200 bg-white shadow-2xs shrink-0">
+                        {iconDef.renderSvg({
+                          size: 22,
+                          color: leg.vehicleColor,
+                          className: 'w-5 h-5',
+                        })}
+                      </div>
+                      <div className="text-left min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[11px] font-bold text-stone-800 group-hover:text-[#0E6466] leading-tight truncate">
+                            {iconDef.name}
+                          </span>
+                          <span className="text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.2 bg-stone-200/60 text-stone-600 rounded shrink-0">
+                            {iconDef.badge}
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-stone-400 block truncate max-w-[190px]">
+                          {iconDef.tagline}
+                        </span>
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-semibold text-[#0E6466] bg-white px-2 py-0.5 rounded-md border border-stone-200 shadow-2xs group-hover:border-[#0E6466] shrink-0 ml-1">
+                      Change
+                    </span>
+                  </div>
+                );
+              })()}
+
               {/* Specific Trek / Hike Mode Details & GPX Telemetry */}
               {isTrekMode && (
                 <div className="bg-[#F8F5EE] border border-[#E8E2D5] rounded-xl p-3 mb-3 text-xs">
@@ -918,42 +1041,188 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </div>
               )}
 
-              {/* Color & Duration Controls */}
-              <div className="pt-2 border-t border-stone-100 flex items-center justify-between gap-3 text-xs">
-                {/* Vehicle Color Swatches */}
-                <div className="flex items-center gap-1">
-                  {PRESET_COLORS.slice(0, 5).map((color) => (
-                    <button
-                      key={color}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onUpdateLeg(index, { vehicleColor: color, trailColor: color });
-                      }}
-                      style={{ backgroundColor: color }}
-                      className={`w-4 h-4 rounded-full border transition-transform ${
-                        leg.vehicleColor === color ? 'scale-125 border-stone-800' : 'border-stone-200'
-                      }`}
-                    />
-                  ))}
+              {/* Route Trail & Vehicle Styling Section */}
+              <div className="pt-2.5 border-t border-stone-200/70 space-y-2.5 text-xs">
+                {/* 1. Trail Line Color & Style Controls */}
+                <div className="bg-stone-50/90 p-2.5 rounded-xl border border-stone-200 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <Route className="w-3.5 h-3.5 text-[#0E6466]" />
+                      <span className="text-[10px] uppercase font-bold tracking-wider text-stone-700">
+                        Trail Color
+                      </span>
+                      <span
+                        className="w-2.5 h-2.5 rounded-full border border-stone-300 shadow-2xs inline-block"
+                        style={{ backgroundColor: leg.trailColor || '#F59E0B' }}
+                      />
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onUpdateLeg(index, { trailColor: leg.vehicleColor });
+                        }}
+                        className="text-[10px] font-semibold text-[#0E6466] hover:underline"
+                        title="Match trail color with vehicle accent"
+                      >
+                        Match Vehicle
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onUpdateLeg(index, { showTrail: leg.showTrail === false ? true : false });
+                        }}
+                        className={`px-1.5 py-0.5 rounded-md text-[10px] font-semibold flex items-center gap-1 transition-colors ${
+                          leg.showTrail !== false
+                            ? 'text-[#0E6466] bg-[#0E6466]/10'
+                            : 'text-stone-400 bg-stone-200/60'
+                        }`}
+                        title={leg.showTrail !== false ? 'Hide animated trail path on map' : 'Show animated trail path on map'}
+                      >
+                        {leg.showTrail !== false ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3 text-stone-400" />}
+                        <span className="text-[9px]">{leg.showTrail !== false ? 'Trail On' : 'Hidden'}</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Trail Color Swatches + Custom Color Picker */}
+                  <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                    {TRAIL_COLOR_PRESETS.map((p) => {
+                      const isSelected = (leg.trailColor || '#F59E0B').toLowerCase() === p.hex.toLowerCase();
+                      return (
+                        <button
+                          key={p.hex}
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onUpdateLeg(index, { trailColor: p.hex });
+                          }}
+                          style={{ backgroundColor: p.hex }}
+                          title={`Trail: ${p.name} (${p.hex})`}
+                          className={`w-4 h-4 rounded-full border transition-all ${
+                            isSelected
+                              ? 'scale-125 border-stone-900 ring-2 ring-[#0E6466]/40 shadow-xs'
+                              : 'border-stone-300 hover:scale-110'
+                          }`}
+                        />
+                      );
+                    })}
+
+                    {/* Custom Hex Color Picker */}
+                    <label
+                      onClick={(e) => e.stopPropagation()}
+                      className="relative w-4 h-4 rounded-full border border-stone-300 flex items-center justify-center cursor-pointer hover:scale-110 transition-transform overflow-hidden bg-gradient-to-tr from-cyan-400 via-amber-400 to-indigo-500 shadow-2xs"
+                      title="Custom Trail Hex Color"
+                    >
+                      <input
+                        type="color"
+                        value={leg.trailColor || '#F59E0B'}
+                        onChange={(e) => {
+                          e.stopPropagation();
+                          onUpdateLeg(index, { trailColor: e.target.value });
+                        }}
+                        className="opacity-0 absolute inset-0 cursor-pointer w-full h-full"
+                      />
+                    </label>
+                  </div>
+
+                  {/* Mini Trail Preview Strip */}
+                  <div className="pt-1 flex items-center justify-between text-[10px] text-stone-400 border-t border-stone-200/50 mt-1">
+                    <span className="font-mono text-[9px] text-stone-500 font-medium">
+                      {leg.trailColor || '#F59E0B'}
+                    </span>
+                    <div className="flex-1 max-w-[130px] mx-2 h-2.5 flex items-center">
+                      <svg width="100%" height="8" className="overflow-visible">
+                        <line
+                          x1="0"
+                          y1="4"
+                          x2="100%"
+                          y2="4"
+                          stroke={hexToRgba(leg.trailColor || '#F59E0B', 0.35)}
+                          strokeWidth="6"
+                          strokeLinecap="round"
+                        />
+                        <line
+                          x1="0"
+                          y1="4"
+                          x2="100%"
+                          y2="4"
+                          stroke={leg.trailColor || '#F59E0B'}
+                          strokeWidth="2.5"
+                          strokeDasharray={leg.mode === 'flight' ? '6 4' : leg.mode === 'hike' ? '3 3' : 'none'}
+                          strokeLinecap="round"
+                        />
+                      </svg>
+                    </div>
+                    <span className="text-[9px] uppercase font-bold text-[#0E6466]">
+                      {leg.mode === 'flight' ? 'Flight Arc' : leg.mode === 'hike' ? 'Trek Dotted' : 'Road Solid'}
+                    </span>
+                  </div>
                 </div>
 
-                {/* Duration Slider */}
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[10px] text-stone-500 font-mono-numbers">
-                    {leg.durationSeconds}s
-                  </span>
-                  <input
-                    type="range"
-                    min="3"
-                    max="18"
-                    step="1"
-                    value={leg.durationSeconds}
-                    onChange={(e) => {
-                      e.stopPropagation();
-                      onUpdateLeg(index, { durationSeconds: parseFloat(e.target.value) });
-                    }}
-                    className="w-16 accent-[#0E6466] h-1"
-                  />
+                {/* 2. Vehicle Accent & Animation Duration Row */}
+                <div className="flex items-center justify-between gap-3 pt-0.5">
+                  {/* Vehicle Accent Color */}
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[9px] uppercase font-bold tracking-wider text-stone-500">
+                      Vehicle Color
+                    </span>
+                    <div className="flex items-center gap-1">
+                      {PRESET_COLORS.slice(0, 6).map((color) => (
+                        <button
+                          key={color}
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onUpdateLeg(index, { vehicleColor: color });
+                          }}
+                          style={{ backgroundColor: color }}
+                          title={`Vehicle: ${color}`}
+                          className={`w-3.5 h-3.5 rounded-full border transition-transform ${
+                            leg.vehicleColor === color ? 'scale-125 border-stone-900 ring-1 ring-stone-900/30' : 'border-stone-200 hover:scale-110'
+                          }`}
+                        />
+                      ))}
+                      <label
+                        onClick={(e) => e.stopPropagation()}
+                        className="relative w-3.5 h-3.5 rounded-full border border-stone-300 flex items-center justify-center cursor-pointer hover:scale-110 transition-transform overflow-hidden bg-gradient-to-tr from-amber-400 via-rose-400 to-teal-500 shadow-2xs"
+                        title="Custom Vehicle Color"
+                      >
+                        <input
+                          type="color"
+                          value={leg.vehicleColor}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            onUpdateLeg(index, { vehicleColor: e.target.value });
+                          }}
+                          className="opacity-0 absolute inset-0 cursor-pointer w-full h-full"
+                        />
+                      </label>
+                    </div>
+                  </div>
+
+                  {/* Duration Slider */}
+                  <div className="flex flex-col items-end gap-1">
+                    <span className="text-[9px] uppercase font-bold tracking-wider text-stone-500">
+                      Duration · <span className="font-mono text-stone-700 font-semibold">{leg.durationSeconds}s</span>
+                    </span>
+                    <input
+                      type="range"
+                      min="3"
+                      max="18"
+                      step="1"
+                      value={leg.durationSeconds}
+                      onChange={(e) => {
+                        e.stopPropagation();
+                        onUpdateLeg(index, { durationSeconds: parseFloat(e.target.value) });
+                      }}
+                      className="w-20 accent-[#0E6466] h-1"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
@@ -971,6 +1240,65 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </button>
         )}
       </div>
+
+      {/* Modern Traveler & Vehicle Icon Picker Dialog */}
+      {iconPickerLegIndex !== null && (
+        <IconPickerModal
+          isOpen={true}
+          onClose={() => setIconPickerLegIndex(null)}
+          currentIconId={
+            iconPickerLegIndex === 'new'
+              ? newLegIconId
+              : legs[iconPickerLegIndex]?.customIconId
+          }
+          currentMode={
+            iconPickerLegIndex === 'new'
+              ? newLegMode
+              : legs[iconPickerLegIndex]?.mode || 'suv'
+          }
+          currentColor={
+            iconPickerLegIndex === 'new'
+              ? newLegVehicleColor
+              : legs[iconPickerLegIndex]?.vehicleColor || '#0E6466'
+          }
+          currentTrailColor={
+            iconPickerLegIndex === 'new'
+              ? newLegTrailColor
+              : legs[iconPickerLegIndex]?.trailColor || '#F59E0B'
+          }
+          currentScale={
+            iconPickerLegIndex === 'new'
+              ? 1.1
+              : legs[iconPickerLegIndex]?.vehicleScale || 1.1
+          }
+          onSelectIcon={(iconId) => {
+            if (iconPickerLegIndex === 'new') {
+              setNewLegIconId(iconId);
+            } else if (typeof iconPickerLegIndex === 'number') {
+              onUpdateLeg(iconPickerLegIndex, { customIconId: iconId });
+            }
+          }}
+          onUpdateColor={(color) => {
+            if (iconPickerLegIndex === 'new') {
+              setNewLegVehicleColor(color);
+            } else if (typeof iconPickerLegIndex === 'number') {
+              onUpdateLeg(iconPickerLegIndex, { vehicleColor: color });
+            }
+          }}
+          onUpdateTrailColor={(color) => {
+            if (iconPickerLegIndex === 'new') {
+              setNewLegTrailColor(color);
+            } else if (typeof iconPickerLegIndex === 'number') {
+              onUpdateLeg(iconPickerLegIndex, { trailColor: color });
+            }
+          }}
+          onUpdateScale={(scale) => {
+            if (typeof iconPickerLegIndex === 'number') {
+              onUpdateLeg(iconPickerLegIndex, { vehicleScale: scale });
+            }
+          }}
+        />
+      )}
     </aside>
   );
 };

@@ -338,10 +338,11 @@ export interface ParsedGPXResult {
   name: string;
   totalDistanceKm: number;
   elevationGainMeters: number;
+  elevationLossMeters: number;
   minElevation?: number;
   maxElevation?: number;
   pointCount: number;
-  waypoints: { name: string; lat: number; lng: number }[];
+  waypoints: { name: string; lat: number; lng: number; elevation?: number }[];
   elevationProfile: { distanceKm: number; elevationMeters: number }[];
 }
 
@@ -374,6 +375,7 @@ export function parseGPX(xmlText: string): ParsedGPXResult {
 
   let totalDist = 0;
   let elevationGain = 0;
+  let elevationLoss = 0;
   let minEle: number | undefined;
   let maxEle: number | undefined;
   let prevLat: number | null = null;
@@ -395,8 +397,13 @@ export function parseGPX(xmlText: string): ParsedGPXResult {
         const segDist = haversineDistance(prevLat, prevLng, lat, lon);
         totalDist += segDist;
 
-        if (ele !== undefined && prevEle !== null && ele > prevEle) {
-          elevationGain += ele - prevEle;
+        if (ele !== undefined && prevEle !== null) {
+          const delta = ele - prevEle;
+          if (delta > 0) {
+            elevationGain += delta;
+          } else if (delta < 0) {
+            elevationLoss += Math.abs(delta);
+          }
         }
       }
 
@@ -407,7 +414,7 @@ export function parseGPX(xmlText: string): ParsedGPXResult {
         // Sample elevation profile points at reasonable distance intervals
         if (
           elevationProfile.length === 0 ||
-          totalDist - elevationProfile[elevationProfile.length - 1].distanceKm >= 0.2
+          totalDist - elevationProfile[elevationProfile.length - 1].distanceKm >= 0.15
         ) {
           elevationProfile.push({
             distanceKm: Math.round(totalDist * 10) / 10,
@@ -422,15 +429,36 @@ export function parseGPX(xmlText: string): ParsedGPXResult {
     }
   });
 
+  // Ensure last point is always in elevation profile
+  if (rawPoints.length > 0) {
+    const lastPt = rawPoints[rawPoints.length - 1];
+    const lastEle = lastPt[2];
+    if (lastEle !== undefined) {
+      const roundedDist = Math.round(totalDist * 10) / 10;
+      if (
+        elevationProfile.length === 0 ||
+        elevationProfile[elevationProfile.length - 1].distanceKm !== roundedDist
+      ) {
+        elevationProfile.push({
+          distanceKm: roundedDist,
+          elevationMeters: Math.round(lastEle),
+        });
+      }
+    }
+  }
+
   // Extract named waypoints (campsites, summits, huts)
-  const waypoints: { name: string; lat: number; lng: number }[] = [];
+  const waypoints: { name: string; lat: number; lng: number; elevation?: number }[] = [];
   const wptNodes = xmlDoc.querySelectorAll('wpt');
   wptNodes.forEach((wpt) => {
     const lat = parseFloat(wpt.getAttribute('lat') || '0');
     const lon = parseFloat(wpt.getAttribute('lon') || '0');
     const name = wpt.querySelector('name')?.textContent || 'Waypoint';
+    const eleNode = wpt.querySelector('ele');
+    const ele = eleNode ? parseFloat(eleNode.textContent || '0') : undefined;
+
     if (!isNaN(lat) && !isNaN(lon)) {
-      waypoints.push({ name, lat, lng: lon });
+      waypoints.push({ name, lat, lng: lon, elevation: ele !== undefined && !isNaN(ele) ? Math.round(ele) : undefined });
     }
   });
 
@@ -446,6 +474,7 @@ export function parseGPX(xmlText: string): ParsedGPXResult {
     name: trkName.trim(),
     totalDistanceKm: Math.round(totalDist * 10) / 10,
     elevationGainMeters: Math.round(elevationGain),
+    elevationLossMeters: Math.round(elevationLoss),
     minElevation: minEle !== undefined ? Math.round(minEle) : undefined,
     maxElevation: maxEle !== undefined ? Math.round(maxEle) : undefined,
     pointCount: rawPoints.length,

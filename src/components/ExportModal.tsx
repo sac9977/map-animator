@@ -3,6 +3,7 @@ import { X, Film, CheckCircle, Download, Loader2, Sparkles, Monitor, Smartphone,
 import { AspectRatio, JourneyLeg, VideoExportConfig, VideoResolution, Waypoint } from '../types/travel';
 import { drawAnimatedVehicle } from '../utils/vehicleDrawers';
 import { calculateBearing, toRad } from '../utils/geoRouting';
+import { hexToRgba, getDefaultTrailColorForMode } from '../data/trailStyles';
 
 interface ExportModalProps {
   isOpen: boolean;
@@ -194,16 +195,18 @@ export const ExportModal: React.FC<ExportModalProps> = ({
         }));
 
         ctx.save();
+        const legTrailColor = leg.trailColor || getDefaultTrailColorForMode(leg.mode);
+
         if (leg.mode === 'flight') {
-          ctx.strokeStyle = i <= activeIdx ? '#0284C7' : 'rgba(148, 163, 184, 0.3)';
+          ctx.strokeStyle = i <= activeIdx ? legTrailColor : 'rgba(148, 163, 184, 0.3)';
           ctx.lineWidth = 4;
           ctx.setLineDash([12, 8]);
         } else if (leg.mode === 'hike') {
-          ctx.strokeStyle = i <= activeIdx ? '#D97706' : 'rgba(217, 119, 6, 0.3)';
+          ctx.strokeStyle = i <= activeIdx ? legTrailColor : hexToRgba(legTrailColor, 0.3);
           ctx.lineWidth = 5;
           ctx.setLineDash([6, 8]);
         } else {
-          ctx.strokeStyle = i <= activeIdx ? leg.trailColor : 'rgba(148, 163, 184, 0.3)';
+          ctx.strokeStyle = i <= activeIdx ? legTrailColor : hexToRgba(legTrailColor, 0.3);
           ctx.lineWidth = 6;
           ctx.setLineDash([]);
         }
