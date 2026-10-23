@@ -378,7 +378,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   };
 
   return (
-    <aside className="w-[390px] h-[calc(100vh-64px)] bg-[#F4F1EA] border-r border-[#E6E1D7] flex flex-col shrink-0 overflow-hidden z-20">
+    <aside className="w-[390px] h-[calc(100vh-64px)] bg-[#F4F1EA] border-r border-[#E6E1D7] flex flex-col shrink-0 overflow-hidden z-10">
       {/* Header Info Banner matching safari ticket design */}
       <div className="p-4 border-b border-[#E6E1D7] bg-[#FAF8F5] space-y-3">
         <div className="flex items-center justify-between">

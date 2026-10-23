@@ -405,7 +405,7 @@ export const ElevationProfileViewer: React.FC<ElevationProfileViewerProps> = ({
   return (
     <div
       ref={containerRef}
-      className={`w-full bg-[#FFFFFF] border-t border-[#E6E1D7] flex flex-col z-20 shrink-0 shadow-[0_-4px_16px_-4px_rgba(30,41,59,0.05)] transition-all duration-200 ${containerHeightClass}`}
+      className={`w-full bg-[#FFFFFF] border-t border-[#E6E1D7] flex flex-col z-10 shrink-0 shadow-[0_-4px_16px_-4px_rgba(30,41,59,0.05)] transition-all duration-200 ${containerHeightClass}`}
     >
       {/* Hidden File Input for GPX upload */}
       <input

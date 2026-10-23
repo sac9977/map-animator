@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Search, Check, RotateCcw, Sparkles } from 'lucide-react';
 import {
   TRAVELER_ICONS,
@@ -90,34 +91,47 @@ export const IconPickerModal: React.FC<IconPickerModalProps> = ({
     setActiveTempId(defaultDef.id);
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/60 backdrop-blur-xs animate-in fade-in duration-150">
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-4 bg-stone-900/65 backdrop-blur-xs animate-in fade-in duration-150">
       <div
-        className="bg-white border border-[#E6E1D7] rounded-3xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden animate-in zoom-in-95 duration-150"
+        className="bg-white border border-[#E6E1D7] rounded-3xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[85vh] sm:max-h-[88vh] overflow-hidden animate-in zoom-in-95 duration-150 relative z-[101]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="p-4 sm:p-5 border-b border-stone-200 flex items-center justify-between bg-[#FAF8F5]">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-[#0E6466]/10 text-[#0E6466] flex items-center justify-center shadow-xs">
+        <div className="p-3.5 sm:p-4 border-b border-stone-200 flex items-center justify-between bg-[#FAF8F5] shrink-0">
+          <div className="flex items-center gap-2.5 sm:gap-3">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-[#0E6466]/10 text-[#0E6466] flex items-center justify-center shadow-xs">
               <Sparkles className="w-5 h-5 text-[#0E6466]" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-stone-900 tracking-tight">
+              <h2 className="text-sm sm:text-base font-bold text-stone-900 tracking-tight">
                 Vehicle & Traveler Icon
               </h2>
-              <p className="text-xs text-stone-500">
+              <p className="text-[11px] sm:text-xs text-stone-500 line-clamp-1">
                 Choose the modern avatar or vehicle representing this leg on the journey map
               </p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 text-stone-400 hover:text-stone-700 rounded-xl hover:bg-stone-200/50 transition-colors"
-            title="Close dialog"
-          >
-            <X className="w-5 h-5" />
-          </button>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleApply}
+              className="flex items-center gap-1.5 text-xs font-bold text-white bg-[#0E6466] hover:bg-[#094749] px-3.5 py-1.5 rounded-xl shadow-xs transition-all active:scale-[0.98]"
+              title="Apply selected icon now"
+            >
+              <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+              <span>Apply</span>
+            </button>
+            <button
+              onClick={onClose}
+              className="p-1.5 sm:p-2 text-stone-400 hover:text-stone-700 rounded-xl hover:bg-stone-200/50 transition-colors"
+              title="Close dialog"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Live Preview Hero Strip */}
@@ -322,6 +336,8 @@ export const IconPickerModal: React.FC<IconPickerModalProps> = ({
                 <div
                   key={icon.id}
                   onClick={() => setActiveTempId(icon.id)}
+                  onDoubleClick={handleApply}
+                  title="Click to select, double-click to apply"
                   className={`relative p-3.5 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between ${
                     isSelected
                       ? 'bg-white border-[#0E6466] shadow-[0_4px_16px_-4px_rgba(14,100,102,0.2)] ring-2 ring-[#0E6466]'
@@ -349,7 +365,7 @@ export const IconPickerModal: React.FC<IconPickerModalProps> = ({
                         {icon.badge}
                       </span>
                       {isSelected && (
-                        <span className="w-5 h-5 rounded-full bg-[#0E6466] text-white flex items-center justify-center">
+                        <span className="w-5 h-5 rounded-full bg-[#0E6466] text-white flex items-center justify-center shadow-xs">
                           <Check className="w-3 h-3 stroke-[3]" />
                         </span>
                       )}
@@ -384,13 +400,13 @@ export const IconPickerModal: React.FC<IconPickerModalProps> = ({
         </div>
 
         {/* Footer Actions */}
-        <div className="p-4 border-t border-stone-200 bg-white flex items-center justify-between gap-3">
+        <div className="p-3.5 sm:p-4 border-t border-stone-200 bg-white flex items-center justify-between gap-3 shrink-0 shadow-[0_-4px_16px_rgba(0,0,0,0.04)] z-20">
           <button
             onClick={handleResetToDefault}
             className="flex items-center gap-1.5 text-xs font-semibold text-stone-500 hover:text-stone-800 px-3 py-2 rounded-xl hover:bg-stone-100 transition-colors"
           >
             <RotateCcw className="w-3.5 h-3.5" />
-            <span>Reset to Mode Default</span>
+            <span>Reset Default</span>
           </button>
 
           <div className="flex items-center gap-2">
@@ -402,7 +418,7 @@ export const IconPickerModal: React.FC<IconPickerModalProps> = ({
             </button>
             <button
               onClick={handleApply}
-              className="flex items-center gap-1.5 text-xs font-bold text-white bg-[#0E6466] hover:bg-[#094749] px-5 py-2.5 rounded-xl shadow-xs transition-all active:scale-[0.98]"
+              className="flex items-center gap-1.5 text-xs font-bold text-white bg-[#0E6466] hover:bg-[#094749] px-5 py-2.5 rounded-xl shadow-md hover:shadow-lg transition-all active:scale-[0.98]"
             >
               <Check className="w-4 h-4 stroke-[2.5]" />
               <span>Apply Icon</span>
@@ -410,6 +426,7 @@ export const IconPickerModal: React.FC<IconPickerModalProps> = ({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
