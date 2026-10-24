@@ -102,6 +102,7 @@ export const MapLayer: React.FC<MapLayerProps> = ({
           maxZoom: 19,
           pane: 'cinematic-sat-pane',
           keepBuffer: 6,
+          updateWhenZooming: false, // no tile repaint on every integer zoom cross
         }
       ).addTo(map);
 
@@ -113,6 +114,7 @@ export const MapLayer: React.FC<MapLayerProps> = ({
           opacity: 0.72,
           pane: 'cinematic-hillshade-pane',
           keepBuffer: 6,
+          updateWhenZooming: false,
         }
       ).addTo(map);
 
@@ -124,6 +126,7 @@ export const MapLayer: React.FC<MapLayerProps> = ({
           opacity: 0.85,
           pane: 'cinematic-labels-pane',
           keepBuffer: 6,
+          updateWhenZooming: false,
         }
       ).addTo(map);
 
@@ -134,16 +137,18 @@ export const MapLayer: React.FC<MapLayerProps> = ({
         maxZoom: 17,
         subdomains: 'abc',
         keepBuffer: 6,
+        updateWhenZooming: false,
       }).addTo(map);
       activeLayersRef.current = [topoLayer];
     } else if (activeStyle === 'outdoor') {
       const outdoorLayer = L.tileLayer(
         'https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png',
         {
-          attribution: MAP_THEMES.outdoor.attribution,
-          maxZoom: 18,
-          subdomains: 'abc',
-          keepBuffer: 6,
+        attribution: MAP_THEMES.outdoor.attribution,
+        maxZoom: 18,
+        subdomains: 'abc',
+        keepBuffer: 6,
+        updateWhenZooming: false,
         }
       ).addTo(map);
       activeLayersRef.current = [outdoorLayer];
@@ -151,9 +156,10 @@ export const MapLayer: React.FC<MapLayerProps> = ({
       const satLayer = L.tileLayer(
         'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
         {
-          attribution: MAP_THEMES.satellite.attribution,
-          maxZoom: 19,
-          keepBuffer: 6,
+        attribution: MAP_THEMES.satellite.attribution,
+        maxZoom: 19,
+        keepBuffer: 6,
+        updateWhenZooming: false,
         }
       ).addTo(map);
       activeLayersRef.current = [satLayer];
@@ -164,6 +170,7 @@ export const MapLayer: React.FC<MapLayerProps> = ({
         maxZoom: 19,
         subdomains: 'abc',
         keepBuffer: 6,
+        updateWhenZooming: false,
       }).addTo(map);
       activeLayersRef.current = [osmLayer];
     }

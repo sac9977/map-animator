@@ -16,12 +16,195 @@ export interface VehicleDrawOptions {
   trailColor: string;
 }
 
+// =========================================================================
+// 3D SHADED SPRITE DESIGN SYSTEM ("clean 3d" top-down)
+// Every sprite is lit in local object space so shading stays coherent as
+// the vehicle rotates along its heading:
+// - Light always falls across the sprite's LATERAL axis: the -Y side is
+//   lit (accent + tints towards white), the +Y side falls into shade
+//   (tint towards cool navy, matching the outline hue).
+// - Glass/canopy reads as dark, depth-curved glass with a specular streak.
+// - Crisp outline (#0F172A, lineWidth 2.2, round joins/caps) anchors the
+//   shape over any map style.
+// - Soft layered contact shadow grounds the object on the map.
+// =========================================================================
+
+export const OUTLINE_COLOR = '#0F172A';
+const BODY_BASE = '#F1F5F9';
+const GLASS_BASE = '#1E293B';
+
 /**
- * Draw vehicle or traveler sprite with the bold-outline duotone top-down design language:
- * - Solid crisp dark outline (#0F172A, lineWidth 2.2, round joins/caps)
- * - Light neutral primary body (#F8FAFC / #F1F5F9)
- * - Vibrant accent panels using the leg's color (Amber / Savannah Teal / etc.)
- * - High-contrast cockpit/windshield cutouts (#0F172A)
+ * Global shading-contrast multiplier applied to every gradient in the
+ * design system. Per-caller light/shade amounts are calibrated around a
+ * moderate look; raise this to make the 3-tone read punchier on busy
+ * map tiles (stronger highlights, deeper shade falloff).
+ */
+const SHADE_SCALE = 1.7;
+
+function clamp255(v: number): number {
+  return Math.max(0, Math.min(255, Math.round(v)));
+}
+
+function mixRgb(r: number, g: number, b: number, tr: number, tg: number, tb: number, t: number): [number, number, number] {
+  return [r + (tr - r) * t, g + (tg - g) * t, b + (tb - b) * t];
+}
+
+/** Core-shade target for dark tints: deep cool navy, slightly past
+ * #101A2C so gradient falloff lands with more contrast on map tiles. */
+const SHADE_RGB = [12, 20, 40] as const;
+
+/**
+ * Tints any #RRGGBB / #RGB color lighter (amt > 0, towards white) or
+ * darker/core-shaded (amt < 0, towards cool deep navy). Unknown color
+ * formats pass through untouched.
+ */
+export function tint(hex: string, amt: number): string {
+  const m = /^#([0-9a-fA-F]{2})([0-9a-fA-F]{2})([0-9a-fA-F]{2})$/.exec(hex);
+  if (m) {
+    return tintRgb(hex, parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16), amt);
+  }
+  const s = /^#([0-9a-fA-F])([0-9a-fA-F])([0-9a-fA-F])$/.exec(hex);
+  if (s) {
+    return tintRgb(hex, parseInt(s[1] + s[1], 16), parseInt(s[2] + s[2], 16), parseInt(s[3] + s[3], 16), amt);
+  }
+  return hex;
+}
+
+function tintRgb(_orig: string, r: number, g: number, b: number, amt: number): string {
+  const t = Math.max(-1, Math.min(1, amt));
+  const [nr, ng, nb] = t >= 0
+    ? mixRgb(r, g, b, 255, 255, 255, t)
+    : mixRgb(r, g, b, SHADE_RGB[0], SHADE_RGB[1], SHADE_RGB[2], -t);
+  return `rgb(${clamp255(nr)},${clamp255(ng)},${clamp255(nb)})`;
+}
+
+/** Linear gradient across the LATERAL axis (Y): light on -Y, shade on +Y. */
+function lateralGradY(
+  ctx: CanvasRenderingContext2D,
+  yFrom: number,
+  yTo: number,
+  color: string,
+  lightAmt = 0.30,
+  darkAmt = 0.20
+): CanvasGradient {
+  const g = ctx.createLinearGradient(0, yFrom, 0, yTo);
+  g.addColorStop(0, tint(color, Math.min(1, lightAmt * SHADE_SCALE)));
+  g.addColorStop(0.42, color);
+  g.addColorStop(1, tint(color, -Math.min(1, darkAmt * SHADE_SCALE)));
+  return g;
+}
+
+/** Linear gradient along the LONGITUDINAL axis (X): light from front (+X). */
+function axialGradX(
+  ctx: CanvasRenderingContext2D,
+  xFrom: number,
+  xTo: number,
+  color: string,
+  lightAmt = 0.30,
+  darkAmt = 0.20
+): CanvasGradient {
+  const g = ctx.createLinearGradient(xFrom, 0, xTo, 0);
+  g.addColorStop(0, tint(color, Math.min(1, lightAmt * SHADE_SCALE)));
+  g.addColorStop(0.42, color);
+  g.addColorStop(1, tint(color, -Math.min(1, darkAmt * SHADE_SCALE)));
+  return g;
+}
+
+/** Thin translucent-white specular sheen used sparingly on convex panels.
+ * Alphas are boosted globally (specular variant of SHADE_SCALE) so call
+ * sites stay calibrated while highlights read punchier on map tiles. */
+function sheen(ctx: CanvasRenderingContext2D, x1: number, y1: number, x2: number, y2: number, alpha = 0.45, w = 1.2): void {
+  const boosted = Math.min(0.8, alpha * 1.35);
+  ctx.save();
+  ctx.strokeStyle = `rgba(255,255,255,${boosted})`;
+  ctx.lineWidth = w;
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(x2, y2);
+  ctx.stroke();
+  ctx.restore();
+}
+
+/** Specular streak for glass canopies (diagonal white slash). */
+function glassStreak(ctx: CanvasRenderingContext2D, x: number, y: number, len: number = 8): void {
+  sheen(ctx, x, y - len * 0.7, x + len * 0.55, y + len * 0.55, 0.4);
+}
+
+/** Body panel: gradient fill + crisp outline. */
+function shadedRoundRect(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  r: number,
+  color: string,
+  opts?: { gradX?: boolean; dark?: boolean }
+): void {
+  const horiz = opts?.gradX ?? false;
+  ctx.fillStyle = horiz
+    ? axialGradX(ctx, x, x + w, color)
+    : lateralGradY(ctx, y, y + h, color);
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, h, r);
+  ctx.fill();
+  ctx.stroke();
+}
+
+function shadedEllipse(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  rx: number,
+  ry: number,
+  color: string,
+  opts?: { gradX?: boolean }
+): void {
+  ctx.fillStyle = opts?.gradX
+    ? axialGradX(ctx, x - rx, x + rx, color)
+    : lateralGradY(ctx, y - ry, y + ry, color);
+  ctx.beginPath();
+  ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+}
+
+/**
+ * Renders one icon glyph onto a canvas at devicePixelRatio fidelity.
+ * Used by the icon picker / sidebar previews so they show EXACTLY the
+ * same shaded sprites that animate on the map and in video exports.
+ * The glyph is drawn facing "up" and framed by a 34-unit half extent.
+ */
+export function drawIconGlyphToCanvas(
+  canvas: HTMLCanvasElement,
+  iconId: string,
+  color: string,
+  pixelSize: number
+): void {
+  const dpr = Math.min(window.devicePixelRatio || 1, 3);
+  const w = Math.max(16, Math.round(pixelSize * dpr));
+  if (canvas.width !== w || canvas.height !== w) {
+    canvas.width = w;
+    canvas.height = w;
+  }
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  ctx.clearRect(0, 0, w, w);
+  ctx.save();
+  ctx.translate(w * 0.54, w * 0.5); // slight +X shift balances trailing boat wakes
+  const fit = w * 0.5 / 34;
+  ctx.scale(fit, fit);
+  ctx.rotate(-Math.PI * 0.5);
+  drawSpecificIcon(ctx, iconId, color, 1400, 0);
+  ctx.restore();
+}
+
+/**
+ * Draw vehicle or traveler sprite with the shaded 3-tone top-down design language:
+ * - Crisp dark outline (#0F172A, lineWidth 2.2, round joins/caps)
+ * - Object-space gradient shading: lit -Y edge, shaded +Y edge
+ * - Glass canopies read as dark glazing with specular streaks
+ * - Soft layered contact shadow on the ground
  */
 export function drawAnimatedVehicle(options: VehicleDrawOptions): void {
   const { ctx, x, y, angleRad, mode, iconId, color, scale, altitudeRatio = 0, timeMs } = options;
@@ -47,7 +230,7 @@ export function drawAnimatedVehicle(options: VehicleDrawOptions): void {
     ctx.translate(shadowOffset * 0.4, shadowOffset);
     ctx.rotate(angleRad);
     ctx.scale(scale * (1 + altitudeRatio * 0.1), scale * (1 + altitudeRatio * 0.1));
-    ctx.fillStyle = `rgba(15, 23, 42, ${Math.max(0.08, 0.35 - altitudeRatio * 0.2)})`;
+    ctx.fillStyle = `rgba(15, 23, 42, ${Math.max(0.08, 0.42 - altitudeRatio * 0.22)})`;
     drawAircraftGroundShadow(ctx, resolvedIconId);
     ctx.restore();
 
@@ -67,11 +250,15 @@ export function drawAnimatedVehicle(options: VehicleDrawOptions): void {
   ctx.rotate(angleRad);
   ctx.scale(scale, scale);
 
-  // Soft directional ground contact shadow
+  // Soft two-layer ground contact shadow (wide soft + tight core)
   ctx.save();
-  ctx.fillStyle = 'rgba(15, 23, 42, 0.22)';
+  ctx.fillStyle = 'rgba(15, 23, 42, 0.19)';
   ctx.beginPath();
-  ctx.ellipse(1, 2, 17, 8.5, 0, 0, Math.PI * 2);
+  ctx.ellipse(1, 2, 19, 10, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = 'rgba(15, 23, 42, 0.19)';
+  ctx.beginPath();
+  ctx.ellipse(0, 1, 14.5, 7, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
 
@@ -81,7 +268,7 @@ export function drawAnimatedVehicle(options: VehicleDrawOptions): void {
 }
 
 /**
- * Route to individual modern icon drawer
+ * Route to individual shaded icon drawer
  */
 function drawSpecificIcon(
   ctx: CanvasRenderingContext2D,
@@ -90,7 +277,7 @@ function drawSpecificIcon(
   timeMs: number,
   _altitudeRatio: number
 ): void {
-  // Common line styles for bold-duotone system
+  // Common line styles for the shaded 3-tone system
   ctx.lineJoin = 'round';
   ctx.lineCap = 'round';
 
@@ -188,22 +375,18 @@ function drawSpecificIcon(
 
 // =========================================================================
 // 1. AVIATION (+X is forward heading)
-// Matches user reference screenshot:
-// - Swept wings in accent color (#F59E0B / leg color) with bold #0F172A outline
-// - Cylindrical engine pods in #F1F5F9 with bold outline
-// - Fuselage in #F1F5F9 with cockpit crescent cutout
-// - Tail stabilizers in accent color with bold outline
+// Fuselage/wings get cylindrical lateral shading; glass keeps crisp cutouts.
 // =========================================================================
 
 /**
- * Modern Jetliner (Exact match to reference image)
+ * Modern Jetliner
  */
 function drawModernJetliner(ctx: CanvasRenderingContext2D, color: string, _timeMs: number): void {
-  // Left Wing (accent color, bold dark outline)
-  ctx.fillStyle = color;
-  ctx.strokeStyle = '#0F172A';
+  ctx.strokeStyle = OUTLINE_COLOR;
   ctx.lineWidth = 2.2;
 
+  // Left Wing (accent, lit top edge)
+  ctx.fillStyle = lateralGradY(ctx, -27, -4.5, color, 0.34, 0.18);
   ctx.beginPath();
   ctx.moveTo(3, -4.5);
   ctx.lineTo(-7, -27);
@@ -213,7 +396,8 @@ function drawModernJetliner(ctx: CanvasRenderingContext2D, color: string, _timeM
   ctx.fill();
   ctx.stroke();
 
-  // Right Wing (symmetric)
+  // Right Wing (dark edge of the same sweep)
+  ctx.fillStyle = lateralGradY(ctx, 4.5, 27, color, 0.28, 0.26);
   ctx.beginPath();
   ctx.moveTo(3, 4.5);
   ctx.lineTo(-7, 27);
@@ -223,20 +407,21 @@ function drawModernJetliner(ctx: CanvasRenderingContext2D, color: string, _timeM
   ctx.fill();
   ctx.stroke();
 
-  // Underslung Engine Nacelles (light grey #F1F5F9, bold outline)
-  ctx.fillStyle = '#F1F5F9';
+  // Underslung Engine Nacelles (light aluminium with cylindrical shading)
+  ctx.fillStyle = lateralGradY(ctx, -16.5, -12, BODY_BASE);
   ctx.beginPath();
   ctx.roundRect(-4, -16.5, 11, 4.5, 2);
   ctx.fill();
   ctx.stroke();
 
+  ctx.fillStyle = lateralGradY(ctx, 12, 16.5, BODY_BASE);
   ctx.beginPath();
   ctx.roundRect(-4, 12, 11, 4.5, 2);
   ctx.fill();
   ctx.stroke();
 
-  // Horizontal Tail Stabilizers (accent color, bold outline)
-  ctx.fillStyle = color;
+  // Horizontal Tail Stabilizers (accent)
+  ctx.fillStyle = lateralGradY(ctx, -12, -2.5, color, 0.3, 0.18);
   ctx.beginPath();
   ctx.moveTo(-14, -2.5);
   ctx.lineTo(-21, -12);
@@ -246,6 +431,7 @@ function drawModernJetliner(ctx: CanvasRenderingContext2D, color: string, _timeM
   ctx.fill();
   ctx.stroke();
 
+  ctx.fillStyle = lateralGradY(ctx, 2.5, 12, color, 0.26, 0.24);
   ctx.beginPath();
   ctx.moveTo(-14, 2.5);
   ctx.lineTo(-21, 12);
@@ -255,8 +441,8 @@ function drawModernJetliner(ctx: CanvasRenderingContext2D, color: string, _timeM
   ctx.fill();
   ctx.stroke();
 
-  // Main Fuselage (light off-white #F1F5F9, bold #0F172A outline)
-  ctx.fillStyle = '#F1F5F9';
+  // Main Fuselage (cylindrical light-to-shade across the tube)
+  ctx.fillStyle = lateralGradY(ctx, -4.5, 4.5, BODY_BASE, 0.42, 0.30);
   ctx.beginPath();
   ctx.moveTo(21, 0);
   ctx.bezierCurveTo(21, -4.5, 17, -4.5, -15, -4.5);
@@ -268,8 +454,11 @@ function drawModernJetliner(ctx: CanvasRenderingContext2D, color: string, _timeM
   ctx.fill();
   ctx.stroke();
 
+  // Fuselage sheen along the lit side
+  sheen(ctx, -12, -3.2, 16, -3.2, 0.4);
+
   // Cockpit Crescent Cutout
-  ctx.strokeStyle = '#0F172A';
+  ctx.strokeStyle = OUTLINE_COLOR;
   ctx.lineWidth = 2.4;
   ctx.beginPath();
   ctx.arc(15, 0, 2.8, -Math.PI * 0.45, Math.PI * 0.45);
@@ -280,23 +469,28 @@ function drawModernJetliner(ctx: CanvasRenderingContext2D, color: string, _timeM
  * Safari Bush Plane (High-wing Cessna Caravan)
  */
 function drawBushPlane(ctx: CanvasRenderingContext2D, color: string, timeMs: number): void {
-  // Straight High Wing in accent color with bold outline
-  ctx.fillStyle = color;
-  ctx.strokeStyle = '#0F172A';
+  ctx.strokeStyle = OUTLINE_COLOR;
   ctx.lineWidth = 2.2;
+
+  // Straight High Wing in accent color
+  ctx.fillStyle = lateralGradY(ctx, -26, 26, color, 0.22, 0.22);
   ctx.beginPath();
   ctx.roundRect(-2, -26, 7, 52, 2.5);
   ctx.fill();
   ctx.stroke();
+  // Wing edge sheens
+  sheen(ctx, -0.6, -22, -0.6, -6, 0.32);
+  sheen(ctx, -0.6, 6, -0.6, 22, 0.18);
 
   // Tailplane
+  ctx.fillStyle = lateralGradY(ctx, -10, 10, color, 0.26, 0.22);
   ctx.beginPath();
   ctx.roundRect(-18, -10, 4.5, 20, 1.5);
   ctx.fill();
   ctx.stroke();
 
-  // Fuselage in #F1F5F9
-  ctx.fillStyle = '#F1F5F9';
+  // Fuselage
+  ctx.fillStyle = lateralGradY(ctx, -4, 4, BODY_BASE, 0.42, 0.32);
   ctx.beginPath();
   ctx.moveTo(18, 0);
   ctx.bezierCurveTo(18, -4, 14, -4, -14, -4);
@@ -308,8 +502,10 @@ function drawBushPlane(ctx: CanvasRenderingContext2D, color: string, timeMs: num
   ctx.fill();
   ctx.stroke();
 
+  sheen(ctx, -12, -2.8, 14, -2.8, 0.4);
+
   // Cockpit windshield arc
-  ctx.strokeStyle = '#0F172A';
+  ctx.strokeStyle = OUTLINE_COLOR;
   ctx.lineWidth = 2.2;
   ctx.beginPath();
   ctx.arc(12, 0, 2.6, -Math.PI * 0.45, Math.PI * 0.45);
@@ -321,7 +517,7 @@ function drawBushPlane(ctx: CanvasRenderingContext2D, color: string, timeMs: num
   ctx.beginPath();
   ctx.ellipse(20, 0, 2, 10, 0, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = '#0F172A';
+  ctx.fillStyle = OUTLINE_COLOR;
   ctx.beginPath();
   ctx.arc(19, 0, 1.8, 0, Math.PI * 2);
   ctx.fill();
@@ -331,43 +527,47 @@ function drawBushPlane(ctx: CanvasRenderingContext2D, color: string, timeMs: num
  * Twin Turboprop Utility Aircraft
  */
 function drawTwinTurboprop(ctx: CanvasRenderingContext2D, color: string, _timeMs: number): void {
-  // Wings with accent color
-  ctx.fillStyle = color;
-  ctx.strokeStyle = '#0F172A';
+  ctx.strokeStyle = OUTLINE_COLOR;
   ctx.lineWidth = 2.2;
+
+  // Wings with accent color
+  ctx.fillStyle = lateralGradY(ctx, -25, 25, color, 0.2, 0.2);
   ctx.beginPath();
   ctx.roundRect(-2, -25, 6.5, 50, 2);
   ctx.fill();
   ctx.stroke();
+  sheen(ctx, -0.4, -20, -0.4, -6, 0.28);
+  sheen(ctx, -0.4, 6, -0.4, 20, 0.16);
 
-  // Engine nacelles in #F1F5F9
-  ctx.fillStyle = '#F1F5F9';
+  // Engine nacelles
+  ctx.fillStyle = lateralGradY(ctx, -15, -10.5, BODY_BASE);
   ctx.beginPath();
   ctx.roundRect(-4, -15, 10, 4.5, 2);
   ctx.fill();
   ctx.stroke();
 
+  ctx.fillStyle = lateralGradY(ctx, 10.5, 15, BODY_BASE);
   ctx.beginPath();
   ctx.roundRect(-4, 10.5, 10, 4.5, 2);
   ctx.fill();
   ctx.stroke();
 
   // Propeller spinner dots
-  ctx.fillStyle = '#0F172A';
+  ctx.fillStyle = OUTLINE_COLOR;
   ctx.beginPath();
   ctx.arc(6.5, -12.75, 1.5, 0, Math.PI * 2);
   ctx.arc(6.5, 12.75, 1.5, 0, Math.PI * 2);
   ctx.fill();
 
   // Tailplane
-  ctx.fillStyle = color;
+  ctx.fillStyle = lateralGradY(ctx, -9, 9, color, 0.26, 0.22);
   ctx.beginPath();
   ctx.roundRect(-17, -9, 4, 18, 1.5);
   ctx.fill();
   ctx.stroke();
 
   // Fuselage
-  ctx.fillStyle = '#F1F5F9';
+  ctx.fillStyle = lateralGradY(ctx, -4.2, 4.2, BODY_BASE, 0.42, 0.32);
   ctx.beginPath();
   ctx.moveTo(19, 0);
   ctx.bezierCurveTo(19, -4.2, 15, -4.2, -14, -4.2);
@@ -379,8 +579,10 @@ function drawTwinTurboprop(ctx: CanvasRenderingContext2D, color: string, _timeMs
   ctx.fill();
   ctx.stroke();
 
+  sheen(ctx, -11, -3, 13, -3, 0.4);
+
   // Cockpit
-  ctx.strokeStyle = '#0F172A';
+  ctx.strokeStyle = OUTLINE_COLOR;
   ctx.lineWidth = 2.2;
   ctx.beginPath();
   ctx.arc(13.5, 0, 2.6, -Math.PI * 0.45, Math.PI * 0.45);
@@ -392,7 +594,7 @@ function drawTwinTurboprop(ctx: CanvasRenderingContext2D, color: string, _timeMs
  */
 function drawExpeditionHelicopter(ctx: CanvasRenderingContext2D, color: string, timeMs: number): void {
   // Landing skids in bold dark
-  ctx.strokeStyle = '#0F172A';
+  ctx.strokeStyle = OUTLINE_COLOR;
   ctx.lineWidth = 2.2;
   ctx.beginPath();
   ctx.moveTo(10, -8);
@@ -406,28 +608,33 @@ function drawExpeditionHelicopter(ctx: CanvasRenderingContext2D, color: string, 
   ctx.moveTo(-8, 0);
   ctx.lineTo(-24, 0);
   ctx.stroke();
-  ctx.fillStyle = color;
+  ctx.fillStyle = axialGradX(ctx, -26, -23, color);
   ctx.fillRect(-26, -4, 3, 8);
+  ctx.strokeRect(-26, -4, 3, 8);
 
-  // Teardrop fuselage in #F1F5F9
-  ctx.fillStyle = '#F1F5F9';
+  // Teardrop fuselage
+  ctx.fillStyle = lateralGradY(ctx, -7, 7, BODY_BASE, 0.4, 0.32);
   ctx.beginPath();
   ctx.ellipse(2, 0, 13, 7, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
 
-  // Cockpit canopy in accent
-  ctx.fillStyle = color;
+  // Fuselage sheen along the lit side
+  sheen(ctx, -6, -5.4, 9, -5.4, 0.38);
+
+  // Cockpit canopy in accent with glass shading
+  ctx.fillStyle = lateralGradY(ctx, -4.5, 4.5, color, 0.22, 0.4);
   ctx.beginPath();
   ctx.ellipse(8, 0, 5, 4.5, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
+  glassStreak(ctx, 6.5, -2.4, 4);
 
   // Spinning 4-blade rotor
   const rotorAngle = (timeMs * 0.04) % (Math.PI * 2);
   ctx.save();
   ctx.rotate(rotorAngle);
-  ctx.strokeStyle = '#0F172A';
+  ctx.strokeStyle = OUTLINE_COLOR;
   ctx.lineWidth = 2.2;
   ctx.beginPath();
   ctx.moveTo(-22, 0);
@@ -435,7 +642,7 @@ function drawExpeditionHelicopter(ctx: CanvasRenderingContext2D, color: string, 
   ctx.moveTo(0, -22);
   ctx.lineTo(0, 22);
   ctx.stroke();
-  ctx.fillStyle = color;
+  ctx.fillStyle = axialGradX(ctx, -3, 3, color);
   ctx.beginPath();
   ctx.arc(0, 0, 3, 0, Math.PI * 2);
   ctx.fill();
@@ -447,18 +654,22 @@ function drawExpeditionHelicopter(ctx: CanvasRenderingContext2D, color: string, 
  * Safari Hot Air Balloon
  */
 function drawSafariBalloon(ctx: CanvasRenderingContext2D, color: string, _timeMs: number): void {
-  // Outer circle with bold outline
-  ctx.strokeStyle = '#0F172A';
+  ctx.strokeStyle = OUTLINE_COLOR;
   ctx.lineWidth = 2.4;
 
-  // Duotone alternating segments
-  ctx.fillStyle = color;
+  // Envelope base with spherical shading
+  const envGrad = ctx.createRadialGradient(-5, -5, 2, 0, 0, 17);
+  envGrad.addColorStop(0, tint(color, 0.45));
+  envGrad.addColorStop(0.65, color);
+  envGrad.addColorStop(1, tint(color, -0.24));
+  ctx.fillStyle = envGrad;
   ctx.beginPath();
   ctx.arc(0, 0, 17, 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
 
-  ctx.fillStyle = '#F1F5F9';
+  // Alternating cream gore segments (spherical shading via alpha overlays)
+  ctx.fillStyle = 'rgba(248,250,252,0.9)';
   ctx.beginPath();
   ctx.moveTo(0, 0);
   ctx.arc(0, 0, 17, -Math.PI / 4, Math.PI / 4);
@@ -466,6 +677,7 @@ function drawSafariBalloon(ctx: CanvasRenderingContext2D, color: string, _timeMs
   ctx.fill();
   ctx.stroke();
 
+  ctx.fillStyle = 'rgba(248,250,252,0.9)';
   ctx.beginPath();
   ctx.moveTo(0, 0);
   ctx.arc(0, 0, 17, (3 * Math.PI) / 4, (5 * Math.PI) / 4);
@@ -473,8 +685,23 @@ function drawSafariBalloon(ctx: CanvasRenderingContext2D, color: string, _timeMs
   ctx.fill();
   ctx.stroke();
 
-  // Inner ring
-  ctx.fillStyle = '#F1F5F9';
+  // Tinted red overlay on the dark hemisphere edge for depth
+  ctx.fillStyle = `rgba(16,26,44,0.12)`;
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.arc(0, 0, 17, 0.6, 2.1);
+  ctx.closePath();
+  ctx.fill();
+
+  // Specular highlight rim (top-left of envelope)
+  ctx.strokeStyle = 'rgba(255,255,255,0.55)';
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  ctx.arc(0, 0, 14.6, Math.PI * 0.95, Math.PI * 1.45);
+  ctx.stroke();
+
+  // Inner ring (burner throat)
+  ctx.fillStyle = lateralGradY(ctx, -7, 7, BODY_BASE, 0.35, 0.3);
   ctx.beginPath();
   ctx.arc(0, 0, 7, 0, Math.PI * 2);
   ctx.fill();
@@ -489,17 +716,19 @@ function drawSafariBalloon(ctx: CanvasRenderingContext2D, color: string, _timeMs
 
 // =========================================================================
 // 2. OVERLAND & ROAD VEHICLES (+X is forward heading)
+// Bodies get cross-car gradient shading; hoods are front-lit accents;
+// glass reads as dark glazing; lights stay luminous white/red.
 // =========================================================================
 
 /**
  * Modern Overland Safari 4x4 (Defender style)
  */
 function drawExpedition4x4(ctx: CanvasRenderingContext2D, color: string, _timeMs: number): void {
-  ctx.strokeStyle = '#0F172A';
+  ctx.strokeStyle = OUTLINE_COLOR;
   ctx.lineWidth = 2.2;
 
   // Side mirrors
-  ctx.fillStyle = '#0F172A';
+  ctx.fillStyle = OUTLINE_COLOR;
   ctx.fillRect(8, -11, 2.5, 2);
   ctx.fillRect(8, 9, 2.5, 2);
 
@@ -507,31 +736,41 @@ function drawExpedition4x4(ctx: CanvasRenderingContext2D, color: string, _timeMs
   ctx.beginPath();
   ctx.arc(-18, 0, 4, 0, Math.PI * 2);
   ctx.fill();
+  ctx.fillStyle = tint(color, 0.18);
+  ctx.beginPath();
+  ctx.arc(-18, -0.6, 1.9, 0, Math.PI * 2);
+  ctx.fill();
   ctx.fillStyle = color;
   ctx.beginPath();
-  ctx.arc(-18, 0, 1.8, 0, Math.PI * 2);
+  ctx.arc(-18, 0.4, 1.4, 0, Math.PI * 2);
   ctx.fill();
+  ctx.strokeStyle = OUTLINE_COLOR;
+  ctx.lineWidth = 1.4;
+  ctx.stroke();
 
-  // Main chassis in #F1F5F9 with bold outline
-  ctx.fillStyle = '#F1F5F9';
+  // Main chassis
+  ctx.strokeStyle = OUTLINE_COLOR;
+  ctx.lineWidth = 2.2;
+  ctx.fillStyle = lateralGradY(ctx, -9, 9, BODY_BASE, 0.34, 0.30);
   ctx.beginPath();
   ctx.roundRect(-16, -9, 32, 18, 4);
   ctx.fill();
   ctx.stroke();
 
-  // Front Hood Panel in accent color
-  ctx.fillStyle = color;
+  // Front Hood Panel in accent color, lit from the nose
+  ctx.fillStyle = axialGradX(ctx, 8, 15, color, 0.30, 0.22);
   ctx.beginPath();
   ctx.roundRect(8, -7.5, 7, 15, 2);
   ctx.fill();
   ctx.stroke();
+  sheen(ctx, 9.4, -5.4, 9.4, 5.4, 0.28);
 
-  // Windshield in #0F172A
-  ctx.fillStyle = '#0F172A';
+  // Windshield in dark glazing
+  ctx.fillStyle = GLASS_BASE;
   ctx.fillRect(5, -7.5, 3, 15);
 
   // Expedition Roof Rack & storage pod
-  ctx.fillStyle = color;
+  ctx.fillStyle = axialGradX(ctx, -12, 2, color, 0.18, 0.24);
   ctx.beginPath();
   ctx.roundRect(-12, -7, 14, 14, 2);
   ctx.fill();
@@ -541,6 +780,8 @@ function drawExpedition4x4(ctx: CanvasRenderingContext2D, color: string, _timeMs
   ctx.moveTo(-5, -7);
   ctx.lineTo(-5, 7);
   ctx.stroke();
+  // Roof rack rim highlight along the lit side
+  sheen(ctx, -10.6, -5.6, 0.6, -5.6, 0.3);
 
   // Front LED Headlights
   ctx.fillStyle = '#FFFFFF';
@@ -552,30 +793,37 @@ function drawExpedition4x4(ctx: CanvasRenderingContext2D, color: string, _timeMs
  * Modern Luxury Rover / Aerodynamic SUV
  */
 function drawModernLuxuryRover(ctx: CanvasRenderingContext2D, color: string, _timeMs: number): void {
-  ctx.strokeStyle = '#0F172A';
+  ctx.strokeStyle = OUTLINE_COLOR;
   ctx.lineWidth = 2.2;
 
   // Mirrors
-  ctx.fillStyle = '#0F172A';
+  ctx.fillStyle = OUTLINE_COLOR;
   ctx.fillRect(8, -10.5, 2.5, 2);
   ctx.fillRect(8, 8.5, 2.5, 2);
 
-  // Sculpted body in #F1F5F9
-  ctx.fillStyle = '#F1F5F9';
+  // Sculpted body
+  ctx.fillStyle = lateralGradY(ctx, -8.5, 8.5, BODY_BASE, 0.36, 0.30);
   ctx.beginPath();
   ctx.roundRect(-16, -8.5, 32, 17, 5.5);
   ctx.fill();
   ctx.stroke();
 
-  // Hood in accent color
-  ctx.fillStyle = color;
+  // Roof sheen down the fastback spine
+  sheen(ctx, -13, -6.2, 7, -6.2, 0.32);
+
+  // Hood in accent color, front-lit
+  ctx.fillStyle = axialGradX(ctx, 8, 15, color, 0.3, 0.22);
   ctx.beginPath();
   ctx.roundRect(8, -7, 7, 14, 2);
   ctx.fill();
   ctx.stroke();
 
-  // Panoramic Black Glass Canopy
-  ctx.fillStyle = '#0F172A';
+  // Panoramic Black Glass Canopy (curved glazing shading)
+  const glassGrad = ctx.createLinearGradient(0, -6.5, 0, 6.5);
+  glassGrad.addColorStop(0, '#334155');
+  glassGrad.addColorStop(0.5, GLASS_BASE);
+  glassGrad.addColorStop(1, '#0B1220');
+  ctx.fillStyle = glassGrad;
   ctx.beginPath();
   ctx.roundRect(-10, -6.5, 16, 13, 2.5);
   ctx.fill();
@@ -589,7 +837,7 @@ function drawModernLuxuryRover(ctx: CanvasRenderingContext2D, color: string, _ti
   ctx.stroke();
 
   // Front laser headlights
-  ctx.strokeStyle = '#0F172A';
+  ctx.strokeStyle = OUTLINE_COLOR;
   ctx.fillStyle = '#FFFFFF';
   ctx.fillRect(15.5, -6, 1.5, 12);
 
@@ -602,31 +850,36 @@ function drawModernLuxuryRover(ctx: CanvasRenderingContext2D, color: string, _ti
  * Adventure Vanlife Camper (Sprinter 4x4)
  */
 function drawAdventureCamperVan(ctx: CanvasRenderingContext2D, color: string, _timeMs: number): void {
-  ctx.strokeStyle = '#0F172A';
+  ctx.strokeStyle = OUTLINE_COLOR;
   ctx.lineWidth = 2.2;
 
   // Mirrors
-  ctx.fillStyle = '#0F172A';
+  ctx.fillStyle = OUTLINE_COLOR;
   ctx.fillRect(11, -11, 2.5, 2);
   ctx.fillRect(11, 9, 2.5, 2);
 
   // Van body
-  ctx.fillStyle = '#F1F5F9';
+  ctx.fillStyle = lateralGradY(ctx, -9, 9, BODY_BASE, 0.34, 0.30);
   ctx.beginPath();
   ctx.roundRect(-19, -9, 37, 18, 4);
   ctx.fill();
   ctx.stroke();
 
+  // Tall-van roof sheen along the lit side
+  sheen(ctx, -16, -6.6, 11, -6.6, 0.3);
+
   // Windshield
-  ctx.fillStyle = '#0F172A';
+  ctx.fillStyle = GLASS_BASE;
   ctx.fillRect(10, -7.5, 4, 15);
 
   // Rooftop solar array in accent
-  ctx.fillStyle = color;
+  ctx.fillStyle = axialGradX(ctx, -12, 7, color, 0.16, 0.22);
   ctx.beginPath();
   ctx.roundRect(-12, -7, 19, 14, 2);
   ctx.fill();
   ctx.stroke();
+  // Solar cell glass sheen
+  sheen(ctx, -10.6, -5.4, 5.4, -5.4, 0.26);
 
   // Grid
   ctx.beginPath();
@@ -643,25 +896,32 @@ function drawAdventureCamperVan(ctx: CanvasRenderingContext2D, color: string, _t
  * Electric Tourer (Taycan Fastback)
  */
 function drawElectricTourer(ctx: CanvasRenderingContext2D, color: string, _timeMs: number): void {
-  ctx.strokeStyle = '#0F172A';
+  ctx.strokeStyle = OUTLINE_COLOR;
   ctx.lineWidth = 2.2;
 
-  // Fastback body in #F1F5F9
-  ctx.fillStyle = '#F1F5F9';
+  // Fastback body
+  ctx.fillStyle = lateralGradY(ctx, -8, 8, BODY_BASE, 0.36, 0.30);
   ctx.beginPath();
   ctx.roundRect(-16, -8, 32, 16, 6);
   ctx.fill();
   ctx.stroke();
 
+  // Spine sheen
+  sheen(ctx, -12.5, -5.9, 7, -5.9, 0.32);
+
   // Hood in accent color
-  ctx.fillStyle = color;
+  ctx.fillStyle = axialGradX(ctx, 8, 15, color, 0.3, 0.22);
   ctx.beginPath();
   ctx.roundRect(8, -6.5, 7, 13, 2);
   ctx.fill();
   ctx.stroke();
 
   // Glass canopy
-  ctx.fillStyle = '#0F172A';
+  const glassGrad = ctx.createLinearGradient(0, -6, 0, 6);
+  glassGrad.addColorStop(0, '#334155');
+  glassGrad.addColorStop(0.5, GLASS_BASE);
+  glassGrad.addColorStop(1, '#0B1220');
+  ctx.fillStyle = glassGrad;
   ctx.beginPath();
   ctx.roundRect(-9, -6, 15, 12, 3);
   ctx.fill();
@@ -677,33 +937,35 @@ function drawElectricTourer(ctx: CanvasRenderingContext2D, color: string, _timeM
  * Classic Heritage 4x4
  */
 function drawClassicHeritage4x4(ctx: CanvasRenderingContext2D, color: string, _timeMs: number): void {
-  ctx.strokeStyle = '#0F172A';
+  ctx.strokeStyle = OUTLINE_COLOR;
   ctx.lineWidth = 2.2;
 
   // Front bumper
-  ctx.fillStyle = '#0F172A';
+  ctx.fillStyle = OUTLINE_COLOR;
   ctx.fillRect(16, -9, 2.5, 18);
 
   // Body
-  ctx.fillStyle = '#F1F5F9';
+  ctx.fillStyle = lateralGradY(ctx, -8.5, 8.5, BODY_BASE, 0.34, 0.30);
   ctx.beginPath();
   ctx.roundRect(-15, -8.5, 30, 17, 3);
   ctx.fill();
   ctx.stroke();
 
+  sheen(ctx, -12, -6.2, 8, -6.2, 0.3);
+
   // Square hood in accent
-  ctx.fillStyle = color;
+  ctx.fillStyle = axialGradX(ctx, 7, 15, color, 0.28, 0.2);
   ctx.beginPath();
   ctx.roundRect(7, -7, 8, 14, 1.5);
   ctx.fill();
   ctx.stroke();
 
   // Windshield
-  ctx.fillStyle = '#0F172A';
+  ctx.fillStyle = GLASS_BASE;
   ctx.fillRect(4, -7, 2.5, 14);
 
   // Canvas open bed
-  ctx.fillStyle = '#F1F5F9';
+  ctx.fillStyle = lateralGradY(ctx, -7, 7, BODY_BASE, 0.24, 0.3);
   ctx.beginPath();
   ctx.roundRect(-13, -7, 15, 14, 2);
   ctx.fill();
@@ -721,7 +983,7 @@ function drawClassicHeritage4x4(ctx: CanvasRenderingContext2D, color: string, _t
  * Adventure Dual-Sport Motorcycle
  */
 function drawAdventureMotorcycle(ctx: CanvasRenderingContext2D, color: string, _timeMs: number): void {
-  ctx.strokeStyle = '#0F172A';
+  ctx.strokeStyle = OUTLINE_COLOR;
   ctx.lineWidth = 2.2;
 
   // Handlebars
@@ -731,36 +993,42 @@ function drawAdventureMotorcycle(ctx: CanvasRenderingContext2D, color: string, _
   ctx.stroke();
 
   // Front wheel
-  ctx.fillStyle = '#0F172A';
+  ctx.fillStyle = OUTLINE_COLOR;
   ctx.fillRect(11, -2, 7, 4);
 
-  // Twin Aluminum Panniers in #F1F5F9 with bold outline
-  ctx.fillStyle = '#F1F5F9';
+  // Twin Aluminum Panniers with cylindrical shading
+  ctx.fillStyle = lateralGradY(ctx, -8.5, -4, BODY_BASE);
   ctx.beginPath();
   ctx.roundRect(-15, -8.5, 8, 4.5, 1.5);
   ctx.fill();
   ctx.stroke();
+  sheen(ctx, -13.6, -8, -8, -8, 0.3);
 
+  ctx.fillStyle = lateralGradY(ctx, 4, 8.5, BODY_BASE);
   ctx.beginPath();
   ctx.roundRect(-15, 4, 8, 4.5, 1.5);
   ctx.fill();
   ctx.stroke();
+  sheen(ctx, -13.6, 4.6, -8, 4.6, 0.2);
 
   // Fuel tank in accent color
-  ctx.fillStyle = color;
+  ctx.fillStyle = lateralGradY(ctx, -4, 4, color, 0.34, 0.26);
   ctx.beginPath();
   ctx.ellipse(-1, 0, 9, 4, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
+  sheen(ctx, -7, -2.9, 3, -2.9, 0.34);
 
   // Seat & rear wheel
-  ctx.fillStyle = '#0F172A';
+  ctx.fillStyle = OUTLINE_COLOR;
   ctx.fillRect(-8, -2, 4, 4);
   ctx.fillRect(-16, -2, 7, 4);
 }
 
 // =========================================================================
 // 3. HUMAN & TREKKERS (+X is forward heading)
+// Torso/pack/head all receive soft cylindrical shading to read as 3D
+// figures, while the flat bold outline keeps them crisp at map scale.
 // =========================================================================
 
 /**
@@ -770,7 +1038,7 @@ function drawModernHiker(ctx: CanvasRenderingContext2D, color: string, timeMs: n
   const step = Math.sin(timeMs * 0.012);
 
   // Trekking poles with swinging cadence (+X forward)
-  ctx.strokeStyle = '#0F172A';
+  ctx.strokeStyle = OUTLINE_COLOR;
   ctx.lineWidth = 2;
   ctx.beginPath();
   ctx.moveTo(0, -7);
@@ -779,29 +1047,42 @@ function drawModernHiker(ctx: CanvasRenderingContext2D, color: string, timeMs: n
   ctx.lineTo(13 - step * 3.5, 9);
   ctx.stroke();
 
-  // Technical backpack in #F1F5F9 with bold outline
-  ctx.fillStyle = '#F1F5F9';
+  ctx.strokeStyle = OUTLINE_COLOR;
+  ctx.lineWidth = 2.2;
+
+  // Technical backpack with pack-volume shading
+  ctx.fillStyle = axialGradX(ctx, -11, -2, BODY_BASE, 0.24, 0.30);
   ctx.beginPath();
   ctx.roundRect(-11, -5.5, 9, 11, 2.5);
   ctx.fill();
   ctx.stroke();
+  // Pack lid sheen and a compression-strap hint
+  sheen(ctx, -10.2, -4.2, -3, -4.2, 0.3);
+  ctx.beginPath();
+  ctx.moveTo(-9.4, -5.5);
+  ctx.lineTo(-9.4, 5.5);
+  ctx.stroke();
 
-  // Explorer jacket/shoulders in accent color
-  ctx.fillStyle = color;
+  // Explorer jacket/shoulders
+  ctx.fillStyle = lateralGradY(ctx, -7.5, 7.5, color, 0.34, 0.28);
   ctx.beginPath();
   ctx.ellipse(0, 0, 5, 7.5, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
+  sheen(ctx, -3.2, -6.4, -3.2, -1, 0.3);
 
-  // Head in #F1F5F9 with cap visor forward (+X)
-  ctx.fillStyle = '#F1F5F9';
+  // Head with spherical shading and cap visor forward (+X)
+  const headGrad = ctx.createRadialGradient(2.6, -1, 0.6, 3.5, 0, 4.2);
+  headGrad.addColorStop(0, '#FFFFFF');
+  headGrad.addColorStop(1, tint(BODY_BASE, -0.22));
+  ctx.fillStyle = headGrad;
   ctx.beginPath();
   ctx.arc(3.5, 0, 3.8, 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
 
-  // Cap visor in #0F172A pointing forward
-  ctx.fillStyle = '#0F172A';
+  // Cap visor in dark pointing forward
+  ctx.fillStyle = OUTLINE_COLOR;
   ctx.beginPath();
   ctx.moveTo(4, -2.5);
   ctx.lineTo(7.5, 0);
@@ -817,7 +1098,7 @@ function drawTrailRunner(ctx: CanvasRenderingContext2D, color: string, timeMs: n
   const cadence = Math.sin(timeMs * 0.02);
 
   // Pumping arms
-  ctx.strokeStyle = '#0F172A';
+  ctx.strokeStyle = OUTLINE_COLOR;
   ctx.lineWidth = 2.2;
   ctx.beginPath();
   ctx.moveTo(0, -5);
@@ -826,28 +1107,38 @@ function drawTrailRunner(ctx: CanvasRenderingContext2D, color: string, timeMs: n
   ctx.lineTo(6 - cadence * 4.5, 7.5);
   ctx.stroke();
 
-  // Hydration vest
-  ctx.fillStyle = '#0F172A';
+  // Hydration vest (dark technical fabric with volume shading)
+  const vestGrad = ctx.createLinearGradient(-8, 0, -2, 0);
+  vestGrad.addColorStop(0, '#1E293B');
+  vestGrad.addColorStop(1, OUTLINE_COLOR);
+  ctx.fillStyle = vestGrad;
   ctx.beginPath();
   ctx.roundRect(-8, -4.5, 6, 9, 2);
   ctx.fill();
+  sheen(ctx, -7.4, -3.6, -3, -3.6, 0.24);
 
-  // Torso in accent
-  ctx.fillStyle = color;
+  // Torso
+  ctx.strokeStyle = OUTLINE_COLOR;
+  ctx.lineWidth = 2.2;
+  ctx.fillStyle = lateralGradY(ctx, -6.5, 6.5, color, 0.34, 0.28);
   ctx.beginPath();
   ctx.ellipse(0, 0, 4.5, 6.5, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
+  sheen(ctx, -2.9, -5.8, -2.9, -0.5, 0.3);
 
-  // Head in #F1F5F9
-  ctx.fillStyle = '#F1F5F9';
+  // Head
+  const headGrad = ctx.createRadialGradient(3.2, -1, 0.5, 4, 0, 3.9);
+  headGrad.addColorStop(0, '#FFFFFF');
+  headGrad.addColorStop(1, tint(BODY_BASE, -0.22));
+  ctx.fillStyle = headGrad;
   ctx.beginPath();
   ctx.arc(4, 0, 3.5, 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
 
   // Visor
-  ctx.fillStyle = '#0F172A';
+  ctx.fillStyle = OUTLINE_COLOR;
   ctx.beginPath();
   ctx.moveTo(4.5, -2);
   ctx.lineTo(7.5, 0);
@@ -863,14 +1154,14 @@ function drawAlpineMountaineer(ctx: CanvasRenderingContext2D, color: string, tim
   const step = Math.sin(timeMs * 0.01);
 
   // Technical ice axe held forward
-  ctx.strokeStyle = '#0F172A';
+  ctx.strokeStyle = OUTLINE_COLOR;
   ctx.lineWidth = 2.2;
   ctx.beginPath();
   ctx.moveTo(2, -8);
   ctx.lineTo(13 + step * 2, -10);
   ctx.stroke();
   // Ice axe pick head
-  ctx.fillStyle = '#F1F5F9';
+  ctx.fillStyle = axialGradX(ctx, 9 + step * 2, 15 + step * 2, BODY_BASE);
   ctx.beginPath();
   ctx.moveTo(11 + step * 2, -12);
   ctx.lineTo(15 + step * 2, -9);
@@ -879,27 +1170,38 @@ function drawAlpineMountaineer(ctx: CanvasRenderingContext2D, color: string, tim
   ctx.fill();
   ctx.stroke();
 
-  // Heavy backpack in #F1F5F9
-  ctx.fillStyle = '#F1F5F9';
+  // Heavy backpack
+  ctx.fillStyle = axialGradX(ctx, -13, -3, BODY_BASE, 0.22, 0.30);
   ctx.beginPath();
   ctx.roundRect(-13, -6.5, 10, 13, 2.5);
   ctx.fill();
   ctx.stroke();
+  sheen(ctx, -12, -5, -4.5, -5, 0.3);
+  ctx.beginPath();
+  ctx.moveTo(-11, -6.5);
+  ctx.lineTo(-11, 6.5);
+  ctx.stroke();
 
-  // Parka shoulders in accent
-  ctx.fillStyle = color;
+  // Parka shoulders
+  ctx.strokeStyle = OUTLINE_COLOR;
+  ctx.lineWidth = 2.2;
+  ctx.fillStyle = lateralGradY(ctx, -8, 8, color, 0.34, 0.28);
   ctx.beginPath();
   ctx.ellipse(-1, 0, 5.5, 8, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
+  sheen(ctx, -4.6, -6.8, -4.6, -0.5, 0.3);
 
-  // Helmet in #F1F5F9
-  ctx.fillStyle = '#F1F5F9';
+  // Helmet with spherical shading
+  const helmetGrad = ctx.createRadialGradient(3, -1.2, 0.6, 4, 0, 4.4);
+  helmetGrad.addColorStop(0, '#FFFFFF');
+  helmetGrad.addColorStop(1, tint(BODY_BASE, -0.24));
+  ctx.fillStyle = helmetGrad;
   ctx.beginPath();
   ctx.arc(4, 0, 4, 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
-  ctx.fillStyle = '#0F172A';
+  ctx.fillStyle = OUTLINE_COLOR;
   ctx.fillRect(2, -1, 4.5, 2);
 }
 
@@ -917,30 +1219,35 @@ function drawSafariRanger(ctx: CanvasRenderingContext2D, color: string, timeMs: 
   ctx.lineTo(14 + step * 2.5, 9.5);
   ctx.stroke();
 
-  // Field pack in #F1F5F9
-  ctx.fillStyle = '#F1F5F9';
-  ctx.strokeStyle = '#0F172A';
+  // Field pack
+  ctx.strokeStyle = OUTLINE_COLOR;
   ctx.lineWidth = 2.2;
+  ctx.fillStyle = axialGradX(ctx, -9, -2, BODY_BASE, 0.22, 0.3);
   ctx.beginPath();
   ctx.roundRect(-9, -5, 7, 10, 2);
   ctx.fill();
   ctx.stroke();
+  sheen(ctx, -8.2, -3.8, -3, -3.8, 0.28);
 
-  // Vest in accent
-  ctx.fillStyle = color;
+  // Vest
+  ctx.fillStyle = lateralGradY(ctx, -7, 7, color, 0.32, 0.26);
   ctx.beginPath();
   ctx.ellipse(0, 0, 4.8, 7, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
+  sheen(ctx, -3, -6, -3, -0.5, 0.28);
 
-  // Wide-brim sun hat
-  ctx.fillStyle = '#F1F5F9';
+  // Wide-brim sun hat (dome + under-shadowed brim)
+  const hatGrad = ctx.createRadialGradient(2.4, -1.4, 0.6, 3.5, 0, 6.4);
+  hatGrad.addColorStop(0, '#FFFFFF');
+  hatGrad.addColorStop(1, tint(BODY_BASE, -0.16));
+  ctx.fillStyle = hatGrad;
   ctx.beginPath();
   ctx.arc(3.5, 0, 6, 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
 
-  ctx.fillStyle = color;
+  ctx.fillStyle = lateralGradY(ctx, -3, 3, color, 0.3, 0.24);
   ctx.beginPath();
   ctx.arc(3.5, 0, 3, 0, Math.PI * 2);
   ctx.fill();
@@ -951,32 +1258,37 @@ function drawSafariRanger(ctx: CanvasRenderingContext2D, color: string, timeMs: 
  * Minimalist Modern City Wanderer
  */
 function drawMinimalistWanderer(ctx: CanvasRenderingContext2D, color: string, _timeMs: number): void {
-  ctx.strokeStyle = '#0F172A';
+  ctx.strokeStyle = OUTLINE_COLOR;
   ctx.lineWidth = 2.2;
 
-  // Daypack in #F1F5F9
-  ctx.fillStyle = '#F1F5F9';
+  // Daypack
+  ctx.fillStyle = axialGradX(ctx, -9, -2, BODY_BASE, 0.22, 0.3);
   ctx.beginPath();
   ctx.roundRect(-9, -5, 7, 10, 2);
   ctx.fill();
   ctx.stroke();
+  sheen(ctx, -8.2, -3.8, -3, -3.8, 0.28);
 
-  // Torso in accent
-  ctx.fillStyle = color;
+  // Torso
+  ctx.fillStyle = lateralGradY(ctx, -6.5, 6.5, color, 0.34, 0.28);
   ctx.beginPath();
   ctx.ellipse(0, 0, 4.5, 6.5, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
+  sheen(ctx, -2.9, -5.8, -2.9, -0.5, 0.3);
 
-  // Head in #F1F5F9
-  ctx.fillStyle = '#F1F5F9';
+  // Head
+  const headGrad = ctx.createRadialGradient(2.8, -1, 0.5, 3.6, 0, 4);
+  headGrad.addColorStop(0, '#FFFFFF');
+  headGrad.addColorStop(1, tint(BODY_BASE, -0.22));
+  ctx.fillStyle = headGrad;
   ctx.beginPath();
   ctx.arc(3.6, 0, 3.6, 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
 
   // Forward heading tick
-  ctx.fillStyle = '#0F172A';
+  ctx.fillStyle = OUTLINE_COLOR;
   ctx.beginPath();
   ctx.arc(8, 0, 1.4, 0, Math.PI * 2);
   ctx.fill();
@@ -984,6 +1296,7 @@ function drawMinimalistWanderer(ctx: CanvasRenderingContext2D, color: string, _t
 
 // =========================================================================
 // 4. WATERCRAFT & MARITIME (+X is forward heading)
+// Hulls get wet-metal cylindrical shading; deck furniture is front-lit.
 // =========================================================================
 
 /**
@@ -1001,16 +1314,22 @@ function drawExpeditionCatamaran(ctx: CanvasRenderingContext2D, color: string, t
   ctx.lineTo(-30 - wakePhase * 15, 16 + wakePhase * 7);
   ctx.stroke();
 
-  ctx.strokeStyle = '#0F172A';
+  ctx.strokeStyle = OUTLINE_COLOR;
   ctx.lineWidth = 2.2;
 
-  // Twin hulls in #F1F5F9 with bold outline
-  ctx.fillStyle = '#F1F5F9';
+  // Twin hulls (lit -Y hull, shaded +Y hull)
+  ctx.fillStyle = lateralGradY(ctx, -12, -4, BODY_BASE, 0.3, 0.22);
   ctx.beginPath();
   ctx.moveTo(17, -8);
   ctx.quadraticCurveTo(8, -12, -16, -10);
   ctx.lineTo(-16, -6);
   ctx.quadraticCurveTo(8, -4, 17, -8);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle = lateralGradY(ctx, 4, 12, BODY_BASE, 0.18, 0.3);
+  ctx.beginPath();
   ctx.moveTo(17, 8);
   ctx.quadraticCurveTo(8, 4, -16, 6);
   ctx.lineTo(-16, 10);
@@ -1020,14 +1339,15 @@ function drawExpeditionCatamaran(ctx: CanvasRenderingContext2D, color: string, t
   ctx.stroke();
 
   // Central Bridge Salon in accent color
-  ctx.fillStyle = color;
+  ctx.fillStyle = axialGradX(ctx, -8, 7, color, 0.24, 0.28);
   ctx.beginPath();
   ctx.roundRect(-8, -6, 15, 12, 2.5);
   ctx.fill();
   ctx.stroke();
+  sheen(ctx, -6.4, -4.2, 4.4, -4.2, 0.3);
 
-  // Windows in #0F172A
-  ctx.fillStyle = '#0F172A';
+  // Windows in dark glazing
+  ctx.fillStyle = GLASS_BASE;
   ctx.fillRect(2, -4, 3.5, 8);
 }
 
@@ -1046,11 +1366,11 @@ function drawModernMotorYacht(ctx: CanvasRenderingContext2D, color: string, time
   ctx.lineTo(-28 - wakePhase * 14, 15 + wakePhase * 7);
   ctx.stroke();
 
-  ctx.strokeStyle = '#0F172A';
+  ctx.strokeStyle = OUTLINE_COLOR;
   ctx.lineWidth = 2.2;
 
-  // Yacht hull in #F1F5F9
-  ctx.fillStyle = '#F1F5F9';
+  // Yacht hull
+  ctx.fillStyle = lateralGradY(ctx, -9, 9, BODY_BASE, 0.34, 0.30);
   ctx.beginPath();
   ctx.moveTo(19, 0);
   ctx.bezierCurveTo(11, -9, -11, -9, -16, -7);
@@ -1061,7 +1381,7 @@ function drawModernMotorYacht(ctx: CanvasRenderingContext2D, color: string, time
   ctx.stroke();
 
   // Teak foredeck in accent color
-  ctx.fillStyle = color;
+  ctx.fillStyle = axialGradX(ctx, 6, 17, color, 0.26, 0.2);
   ctx.beginPath();
   ctx.moveTo(17, 0);
   ctx.lineTo(6, -5.5);
@@ -1069,16 +1389,18 @@ function drawModernMotorYacht(ctx: CanvasRenderingContext2D, color: string, time
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
+  sheen(ctx, 9, -2.8, 15, -0.6, 0.26);
 
-  // Superstructure in #F1F5F9
-  ctx.fillStyle = '#F1F5F9';
+  // Superstructure
+  ctx.fillStyle = lateralGradY(ctx, -5.5, 5.5, BODY_BASE, 0.26, 0.3);
   ctx.beginPath();
   ctx.roundRect(-9, -5.5, 14, 11, 2.5);
   ctx.fill();
   ctx.stroke();
+  sheen(ctx, -7.6, -3.9, 3, -3.9, 0.3);
 
   // Windscreen
-  ctx.fillStyle = '#0F172A';
+  ctx.fillStyle = GLASS_BASE;
   ctx.fillRect(1, -4, 3, 8);
 }
 
@@ -1086,16 +1408,16 @@ function drawModernMotorYacht(ctx: CanvasRenderingContext2D, color: string, time
  * Zodiac / RIB Speedboat
  */
 function drawZodiacSpeedboat(ctx: CanvasRenderingContext2D, color: string, _timeMs: number): void {
-  ctx.strokeStyle = '#0F172A';
+  ctx.strokeStyle = OUTLINE_COLOR;
   ctx.lineWidth = 2.2;
 
   // Twin outboards
-  ctx.fillStyle = '#0F172A';
+  ctx.fillStyle = OUTLINE_COLOR;
   ctx.fillRect(-16, -5, 4.5, 3);
   ctx.fillRect(-16, 2, 4.5, 3);
 
-  // Collar in #F1F5F9
-  ctx.fillStyle = '#F1F5F9';
+  // Inflatable collar (tube shading)
+  ctx.fillStyle = lateralGradY(ctx, -8, 8, BODY_BASE, 0.36, 0.3);
   ctx.beginPath();
   ctx.moveTo(16, 0);
   ctx.bezierCurveTo(11, -8, -10, -8, -13, -6);
@@ -1105,15 +1427,18 @@ function drawZodiacSpeedboat(ctx: CanvasRenderingContext2D, color: string, _time
   ctx.fill();
   ctx.stroke();
 
+  // Collar sheen along the lit tube
+  sheen(ctx, -10, -6.6, 12, -5.6, 0.32);
+
   // Inner deck in accent color
-  ctx.fillStyle = color;
+  ctx.fillStyle = axialGradX(ctx, -9, 5, color, 0.24, 0.26);
   ctx.beginPath();
   ctx.roundRect(-9, -4.5, 14, 9, 2);
   ctx.fill();
   ctx.stroke();
 
   // Console
-  ctx.fillStyle = '#0F172A';
+  ctx.fillStyle = GLASS_BASE;
   ctx.fillRect(0, -2.5, 3.5, 5);
 }
 
@@ -1121,11 +1446,11 @@ function drawZodiacSpeedboat(ctx: CanvasRenderingContext2D, color: string, _time
  * Ocean Sloop / Sailboat
  */
 function drawOceanSailboat(ctx: CanvasRenderingContext2D, color: string, _timeMs: number): void {
-  ctx.strokeStyle = '#0F172A';
+  ctx.strokeStyle = OUTLINE_COLOR;
   ctx.lineWidth = 2.2;
 
-  // Hull in #F1F5F9
-  ctx.fillStyle = '#F1F5F9';
+  // Hull
+  ctx.fillStyle = lateralGradY(ctx, -7.5, 7.5, BODY_BASE, 0.36, 0.30);
   ctx.beginPath();
   ctx.moveTo(18, 0);
   ctx.bezierCurveTo(10, -7.5, -9, -6.5, -15, -4.5);
@@ -1135,8 +1460,11 @@ function drawOceanSailboat(ctx: CanvasRenderingContext2D, color: string, _timeMs
   ctx.fill();
   ctx.stroke();
 
+  // Gunwale sheen
+  sheen(ctx, -11, -5.2, 14, -3.4, 0.3);
+
   // Cockpit in accent color
-  ctx.fillStyle = color;
+  ctx.fillStyle = axialGradX(ctx, -11, -2, color, 0.22, 0.26);
   ctx.beginPath();
   ctx.roundRect(-11, -3.5, 9, 7, 1.5);
   ctx.fill();
@@ -1149,7 +1477,7 @@ function drawOceanSailboat(ctx: CanvasRenderingContext2D, color: string, _timeMs
   ctx.stroke();
 
   // Mast step
-  ctx.fillStyle = color;
+  ctx.fillStyle = axialGradX(ctx, 1, 5, color);
   ctx.beginPath();
   ctx.arc(3, 0, 2, 0, Math.PI * 2);
   ctx.fill();
@@ -1164,11 +1492,11 @@ function drawOceanSailboat(ctx: CanvasRenderingContext2D, color: string, _timeMs
  * Bullet Train (Shinkansen)
  */
 function drawBulletTrain(ctx: CanvasRenderingContext2D, color: string, _timeMs: number): void {
-  ctx.strokeStyle = '#0F172A';
+  ctx.strokeStyle = OUTLINE_COLOR;
   ctx.lineWidth = 2.2;
 
-  // Needle nose locomotive body in #F1F5F9
-  ctx.fillStyle = '#F1F5F9';
+  // Needle nose locomotive body
+  ctx.fillStyle = lateralGradY(ctx, -5.5, 5.5, BODY_BASE, 0.38, 0.32);
   ctx.beginPath();
   ctx.moveTo(21, 0);
   ctx.bezierCurveTo(15, -5.5, 5, -5.5, -18, -5.5);
@@ -1178,13 +1506,16 @@ function drawBulletTrain(ctx: CanvasRenderingContext2D, color: string, _timeMs: 
   ctx.fill();
   ctx.stroke();
 
+  // Nose sheen
+  sheen(ctx, 6, -3.6, 16, -1.6, 0.34);
+
   // Livery stripes in accent color
-  ctx.fillStyle = color;
+  ctx.fillStyle = axialGradX(ctx, -14, 9, color, 0.24, 0.18);
   ctx.fillRect(-14, -5.5, 23, 2);
   ctx.fillRect(-14, 3.5, 23, 2);
 
   // Cockpit windshield chevron
-  ctx.fillStyle = '#0F172A';
+  ctx.fillStyle = GLASS_BASE;
   ctx.beginPath();
   ctx.moveTo(16, 0);
   ctx.lineTo(10, -3);
@@ -1200,27 +1531,41 @@ function drawBulletTrain(ctx: CanvasRenderingContext2D, color: string, _timeMs: 
  * Panorama Glacier Train
  */
 function drawPanoramaGlacierTrain(ctx: CanvasRenderingContext2D, color: string, _timeMs: number): void {
-  ctx.strokeStyle = '#0F172A';
+  ctx.strokeStyle = OUTLINE_COLOR;
   ctx.lineWidth = 2.2;
 
   // Body in accent color
-  ctx.fillStyle = color;
+  ctx.fillStyle = lateralGradY(ctx, -6.5, 6.5, color, 0.3, 0.26);
   ctx.beginPath();
   ctx.roundRect(-17, -6.5, 34, 13, 3);
   ctx.fill();
   ctx.stroke();
 
-  // Panoramic curved glass domes in #F1F5F9
-  ctx.fillStyle = '#F1F5F9';
+  // Roof sheen along the lit side
+  sheen(ctx, -14, -4.8, 12, -4.8, 0.3);
+
+  // Panoramic curved glass domes
+  const domeGradL = ctx.createLinearGradient(0, -4.5, 0, 4.5);
+  domeGradL.addColorStop(0, '#3B4B63');
+  domeGradL.addColorStop(0.5, GLASS_BASE);
+  domeGradL.addColorStop(1, '#0B1220');
+  ctx.fillStyle = domeGradL;
   ctx.beginPath();
   ctx.roundRect(-12, -4.5, 11, 9, 2);
   ctx.fill();
   ctx.stroke();
+  glassStreak(ctx, -8.5, -1.5, 5);
 
+  const domeGradR = ctx.createLinearGradient(0, -4.5, 0, 4.5);
+  domeGradR.addColorStop(0, '#3B4B63');
+  domeGradR.addColorStop(0.5, GLASS_BASE);
+  domeGradR.addColorStop(1, '#0B1220');
+  ctx.fillStyle = domeGradR;
   ctx.beginPath();
   ctx.roundRect(2, -4.5, 11, 9, 2);
   ctx.fill();
   ctx.stroke();
+  glassStreak(ctx, 5.5, -1.5, 5);
 }
 
 // =========================================================================
@@ -1231,11 +1576,11 @@ function drawPanoramaGlacierTrain(ctx: CanvasRenderingContext2D, color: string, 
  * Gravel Bikepacking Rig
  */
 function drawGravelBike(ctx: CanvasRenderingContext2D, color: string, _timeMs: number): void {
-  ctx.strokeStyle = '#0F172A';
+  ctx.strokeStyle = OUTLINE_COLOR;
   ctx.lineWidth = 2.2;
 
   // Wheels in dark
-  ctx.fillStyle = '#0F172A';
+  ctx.fillStyle = OUTLINE_COLOR;
   ctx.fillRect(9, -1.8, 7.5, 3.6);
   ctx.fillRect(-15, -1.8, 7.5, 3.6);
 
@@ -1245,25 +1590,28 @@ function drawGravelBike(ctx: CanvasRenderingContext2D, color: string, _timeMs: n
   ctx.lineTo(8, 6);
   ctx.stroke();
 
-  // Top tube in accent color
-  ctx.strokeStyle = color;
+  // Top tube in accent color (gradient stroke = tubular shading)
+  const tubeGrad = ctx.createLinearGradient(0, -1.2, 0, 1.2);
+  tubeGrad.addColorStop(0, tint(color, 0.32));
+  tubeGrad.addColorStop(1, tint(color, -0.18));
+  ctx.strokeStyle = tubeGrad;
   ctx.lineWidth = 2.5;
   ctx.beginPath();
   ctx.moveTo(9, 0);
   ctx.lineTo(-12, 0);
   ctx.stroke();
 
-  // Bikepacking frame bag in #F1F5F9 with bold outline
-  ctx.strokeStyle = '#0F172A';
+  // Bikepacking frame bag
+  ctx.strokeStyle = OUTLINE_COLOR;
   ctx.lineWidth = 2;
-  ctx.fillStyle = '#F1F5F9';
+  ctx.fillStyle = lateralGradY(ctx, -2, 2, BODY_BASE, 0.3, 0.24);
   ctx.beginPath();
   ctx.roundRect(-4, -2, 7, 4, 1.5);
   ctx.fill();
   ctx.stroke();
 
   // Saddle
-  ctx.fillStyle = '#0F172A';
+  ctx.fillStyle = OUTLINE_COLOR;
   ctx.beginPath();
   ctx.ellipse(-3, 0, 3, 2, 0, 0, Math.PI * 2);
   ctx.fill();
@@ -1273,11 +1621,11 @@ function drawGravelBike(ctx: CanvasRenderingContext2D, color: string, _timeMs: n
  * Modern Urban Commuter Bike
  */
 function drawCommuterBike(ctx: CanvasRenderingContext2D, color: string, _timeMs: number): void {
-  ctx.strokeStyle = '#0F172A';
+  ctx.strokeStyle = OUTLINE_COLOR;
   ctx.lineWidth = 2.2;
 
   // Wheels
-  ctx.fillStyle = '#0F172A';
+  ctx.fillStyle = OUTLINE_COLOR;
   ctx.fillRect(8, -1.5, 7, 3);
   ctx.fillRect(-13, -1.5, 7, 3);
 
@@ -1287,8 +1635,11 @@ function drawCommuterBike(ctx: CanvasRenderingContext2D, color: string, _timeMs:
   ctx.lineTo(8, 6);
   ctx.stroke();
 
-  // Frame in accent
-  ctx.strokeStyle = color;
+  // Frame in accent (tubular gradient stroke)
+  const tubeGrad = ctx.createLinearGradient(0, -1.2, 0, 1.2);
+  tubeGrad.addColorStop(0, tint(color, 0.32));
+  tubeGrad.addColorStop(1, tint(color, -0.18));
+  ctx.strokeStyle = tubeGrad;
   ctx.lineWidth = 2.4;
   ctx.beginPath();
   ctx.moveTo(9, 0);
@@ -1296,7 +1647,7 @@ function drawCommuterBike(ctx: CanvasRenderingContext2D, color: string, _timeMs:
   ctx.stroke();
 
   // Saddle
-  ctx.fillStyle = '#0F172A';
+  ctx.fillStyle = OUTLINE_COLOR;
   ctx.beginPath();
   ctx.arc(-2, 0, 3, 0, Math.PI * 2);
   ctx.fill();
@@ -1354,4 +1705,6 @@ function drawAircraftGroundShadow(ctx: CanvasRenderingContext2D, iconId: string)
   ctx.lineTo(-24, 12);
   ctx.lineTo(-19, 2.5);
   ctx.fill();
+
+  ctx.fillStyle = OUTLINE_COLOR;
 }

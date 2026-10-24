@@ -7,6 +7,20 @@ import { calculateBearing, toRad } from '../utils/geoRouting';
 import { MapLayer } from './MapLayer';
 import { hexToRgba, getDefaultTrailColorForMode } from '../data/trailStyles';
 
+/**
+ * Subpixel projection for the overlay canvas. Leaflet's latLngToContainerPoint
+ * rounds world coordinates to whole CSS pixels (latLngToLayerPoint calls
+ * ._round()), which quantizes trail and sprite motion into 1px steps —
+ * visibly juddery while the camera glides. map.project() returns the exact
+ * same world-pixel space WITHOUT rounding, so everything on the overlay
+ * antialiases at subpixel precision and tracks the smoothed camera
+ * continuously between whole pixels.
+ */
+function projectSubpixel(map: L.Map, lat: number, lng: number): { x: number; y: number } {
+  const p = map.project(L.latLng(lat, lng));
+  return { x: p.x, y: p.y };
+}
+
 interface MapViewportProps {
   homeBase: Waypoint;
   legs: JourneyLeg[];
@@ -49,6 +63,30 @@ export const MapViewport: React.FC<MapViewportProps> = ({
   const isUserInteractingRef = useRef<boolean>(false);
   const interactionTimeoutRef = useRef<number | null>(null);
   const drawOverlayRef = useRef<() => void>(() => {});
+  const redrawQueuedRef = useRef(false);
+
+  /**
+   * Coalesces overlay redraw requests into exactly one draw per animation
+   * frame. Camera motion (Leaflet 'move') and content changes (React state)
+   * both converge on the same frame — so the overlay rasterizes 1:1 with the
+   * smoothed camera instead of being rendered twice per frame.
+   */
+  const scheduleRedraw = useCallback(() => {
+    if (redrawQueuedRef.current) return;
+    redrawQueuedRef.current = true;
+    requestAnimationFrame(() => {
+      redrawQueuedRef.current = false;
+      drawOverlayRef.current();
+    });
+  }, []);
+
+  // Independent camera loop state: target (from playback) + smoothed current
+  // view. The loop runs on raw requestAnimationFrame so zoom/pan arrive at a
+  // perfect 60fps cadence even when React commits opportunistically.
+  const cameraTargetRef = useRef<{ lat: number; lng: number; zoom: number } | null>(null);
+  const cameraCurrentRef = useRef<{ lat: number; lng: number; zoom: number } | null>(null);
+  const cameraRafRef = useRef<number | null>(null);
+  const lastCameraTickRef = useRef<number>(0);
 
   // Initialize Leaflet Map with smooth fractional zooming
   useEffect(() => {
@@ -102,13 +140,13 @@ export const MapViewport: React.FC<MapViewportProps> = ({
       if (!canvas) return;
       canvas.style.transition = 'none';
       canvas.style.transform = 'none';
-      drawOverlayRef.current();
+      scheduleRedraw();
     };
 
     map.on('zoomanim', handleZoomAnim);
     map.on('zoomend', handleZoomEnd);
-    map.on('move', () => drawOverlayRef.current());
-    map.on('resize', () => drawOverlayRef.current());
+    map.on('move', scheduleRedraw);
+    map.on('resize', scheduleRedraw);
 
     // Observe container resizing (e.g. when elevation viewer expands/collapses)
     let resizeObserver: ResizeObserver | null = null;
@@ -128,6 +166,8 @@ export const MapViewport: React.FC<MapViewportProps> = ({
     return () => {
       if (resizeObserver) resizeObserver.disconnect();
       if (interactionTimeoutRef.current) window.clearTimeout(interactionTimeoutRef.current);
+      map.off('move', scheduleRedraw);
+      map.off('resize', scheduleRedraw);
       map.remove();
       mapRef.current = null;
       setMapInstance(null);
@@ -230,9 +270,91 @@ export const MapViewport: React.FC<MapViewportProps> = ({
       targetZoom = overviewZoom + ease * (closeZoom - overviewZoom);
     }
 
-    // Direct 60fps frame positioning with no conflicting CSS transition aborts
-    mapRef.current.setView([currentLat, currentLng], targetZoom, { animate: false });
+    // Stage the target; the dedicated rAF camera loop applies it with
+    // exponential smoothing so the map never steps on React's commit cadence.
+    cameraTargetRef.current = { lat: currentLat, lng: currentLng, zoom: targetZoom };
   }, [activeLegIndex, legProgress, autoZoom, legs]);
+
+  // Dedicated 60fps camera loop: exponentially chases the staged target.
+  // Frame-rate-independent damping (~85ms zoom response, ~55ms pan response)
+  // filters out commit-cadence irregularities and easing-velocity kinks,
+  // producing glide-smooth fractional zoom.
+  useEffect(() => {
+    if (!autoZoom) {
+      cameraTargetRef.current = null;
+      cameraCurrentRef.current = null;
+      return;
+    }
+
+    const CENTER_RATE = 18; // 1/s — tight enough to track the vehicle
+    const ZOOM_RATE = 12; // 1/s — slightly softer so zoom glides
+
+    let running = true;
+    const step = (ts: number) => {
+      if (!running) return;
+      cameraRafRef.current = requestAnimationFrame(step);
+
+      const map = mapRef.current;
+      const target = cameraTargetRef.current;
+      if (!map || !target) return;
+
+      // While the user navigates manually, adopt the live view as "current"
+      // so resuming playback doesn't snap the camera back.
+      if (isUserInteractingRef.current) {
+        const c = map.getCenter();
+        cameraCurrentRef.current = { lat: c.lat, lng: c.lng, zoom: map.getZoom() };
+        lastCameraTickRef.current = ts;
+        return;
+      }
+
+      if (!cameraCurrentRef.current) {
+        cameraCurrentRef.current = { ...target };
+        map.setView([target.lat, target.lng], target.zoom, { animate: false });
+        lastCameraTickRef.current = ts;
+        return;
+      }
+
+      const dt = Math.min(0.1, Math.max(0.001, (ts - lastCameraTickRef.current) / 1000));
+      lastCameraTickRef.current = ts;
+
+      const cur = cameraCurrentRef.current;
+      const aCenter = 1 - Math.exp(-CENTER_RATE * dt);
+      const aZoom = 1 - Math.exp(-ZOOM_RATE * dt);
+
+      const lat = cur.lat + (target.lat - cur.lat) * aCenter;
+      const lng = cur.lng + (target.lng - cur.lng) * aCenter;
+      const zoom = cur.zoom + (target.zoom - cur.zoom) * aZoom;
+
+      const settled =
+        Math.abs(lat - target.lat) < 1e-7 &&
+        Math.abs(lng - target.lng) < 1e-7 &&
+        Math.abs(zoom - target.zoom) < 0.0015;
+
+      if (settled) {
+        cameraCurrentRef.current = { ...target };
+        // Skip redundant repaints once converged
+        const c = map.getCenter();
+        if (Math.abs(map.getZoom() - target.zoom) > 0.0015 ||
+            Math.abs(c.lat - target.lat) > 1e-7 ||
+            Math.abs(c.lng - target.lng) > 1e-7) {
+          map.setView([target.lat, target.lng], target.zoom, { animate: false });
+        }
+        return;
+      }
+
+      cameraCurrentRef.current = { lat, lng, zoom };
+      map.setView([lat, lng], zoom, { animate: false });
+    };
+
+    cameraRafRef.current = requestAnimationFrame(step);
+    return () => {
+      running = false;
+      if (cameraRafRef.current) {
+        cancelAnimationFrame(cameraRafRef.current);
+        cameraRafRef.current = null;
+      }
+    };
+  }, [autoZoom]);
 
   // Synchronize Canvas with Leaflet Map
   const drawOverlay = useCallback(() => {
@@ -257,8 +379,45 @@ export const MapViewport: React.FC<MapViewportProps> = ({
     ctx.scale(dpr, dpr);
     ctx.clearRect(0, 0, size.x, size.y);
 
+    // ----------------------------------------------------------------
+    // Active sprite pose, computed ONCE per frame and shared by the
+    // trail tip AND the vehicle sprite. Tracking compensation: the
+    // polyline's last vertex lands on the EXACT interpolated subpixel
+    // vehicle position (same lat/lng interpolation, same projection),
+    // so sprite and trail are glued together by construction — even
+    // mid-segment, and even while the smoothed camera trails slightly
+    // behind the playback target. Without this, the trail tip advanced
+    // one whole path segment at a time and the sprite drifted off its
+    // trail between segment snaps (amplified by the camera lag).
+    // ----------------------------------------------------------------
+    let activePose: {
+      ti: number;
+      tip: { x: number; y: number };
+      from: [number, number];
+      to: [number, number];
+    } | null = null;
+    if (legs.length > 0 && activeLegIndex < legs.length) {
+      const path = legs[activeLegIndex].cachedPath;
+      if (path && path.length >= 2) {
+        const fi = legProgress * (path.length - 1);
+        const ti = Math.max(0, Math.floor(fi));
+        const tf = fi - ti;
+        const i2 = Math.min(path.length - 1, ti + 1);
+        const p1 = path[ti];
+        const p2 = path[i2];
+        const lat = p1[0] + (p2[0] - p1[0]) * tf;
+        const lng = p1[1] + (p2[1] - p1[1]) * tf;
+        activePose = {
+          ti,
+          tip: projectSubpixel(map, lat, lng),
+          from: p1,
+          to: p2,
+        };
+      }
+    }
+
     // 1. Draw Home Base Pin
-    const homePx = map.latLngToContainerPoint([homeBase.lat, homeBase.lng]);
+    const homePx = projectSubpixel(map, homeBase.lat, homeBase.lng);
     drawWaypointMarker(ctx, homePx.x, homePx.y, homeBase.name, '#0E6466', true);
 
     // 2. Draw All Legs (Past legs solid, active leg animating up to progress, future legs faint)
@@ -271,13 +430,19 @@ export const MapViewport: React.FC<MapViewportProps> = ({
 
       // Draw route line
       const trailColor = leg.trailColor || getDefaultTrailColorForMode(leg.mode);
-      const points = leg.cachedPath.map(coord => map.latLngToContainerPoint(coord));
+      const points = leg.cachedPath.map(coord => projectSubpixel(map, coord[0], coord[1]));
 
-      const count = isActive
-        ? Math.max(2, Math.floor(points.length * legProgress))
-        : isPast
-        ? points.length
-        : points.length;
+      // For the active leg, cap the polyline at the sprite's exact pose
+      // (add the interpolated tip vertex when mid-segment). Past/future
+      // legs always draw their full path.
+      let trailPoints = points;
+      if (isActive && activePose) {
+        if (activePose.ti + 1 < points.length) {
+          trailPoints = points.slice(0, activePose.ti + 1).concat([activePose.tip]);
+        } else {
+          trailPoints = points.slice(0, activePose.ti + 1);
+        }
+      }
 
       // Soft ambient glow / casing under active trail line for crisp legibility
       if (isActive && leg.showTrail !== false) {
@@ -287,7 +452,7 @@ export const MapViewport: React.FC<MapViewportProps> = ({
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
         ctx.beginPath();
-        points.slice(0, count).forEach((pt, i) => {
+        trailPoints.forEach((pt, i) => {
           if (i === 0) ctx.moveTo(pt.x, pt.y);
           else ctx.lineTo(pt.x, pt.y);
         });
@@ -329,7 +494,7 @@ export const MapViewport: React.FC<MapViewportProps> = ({
       }
 
       ctx.beginPath();
-      points.slice(0, count).forEach((pt, i) => {
+      trailPoints.forEach((pt, i) => {
         if (i === 0) ctx.moveTo(pt.x, pt.y);
         else ctx.lineTo(pt.x, pt.y);
       });
@@ -337,30 +502,26 @@ export const MapViewport: React.FC<MapViewportProps> = ({
       ctx.restore();
 
       // Destination Pin
-      const destPx = map.latLngToContainerPoint([leg.to.lat, leg.to.lng]);
+      const destPx = projectSubpixel(map, leg.to.lat, leg.to.lng);
       drawWaypointMarker(ctx, destPx.x, destPx.y, leg.to.name, leg.vehicleColor, false, idx + 1);
     });
 
-    // 3. Draw Active Animated Vehicle
-    if (legs.length > 0 && activeLegIndex < legs.length) {
+    // 3. Draw Active Animated Vehicle — at the shared pose (same
+    // interpolation + subpixel projection the trail tip uses), so the
+    // sprite sits exactly on its trail end regardless of camera lag.
+    if (legs.length > 0 && activeLegIndex < legs.length && activePose) {
       const activeLeg = legs[activeLegIndex];
       const path = activeLeg.cachedPath;
       if (path && path.length >= 2) {
-        const floatIdx = legProgress * (path.length - 1);
-        const idxLow = Math.floor(floatIdx);
-        const idxHigh = Math.min(path.length - 1, idxLow + 1);
-        const fraction = floatIdx - idxLow;
-
-        const p1 = path[idxLow];
-        const p2 = path[idxHigh];
-
-        // Interpolated coordinate
-        const currentLat = p1[0] + (p2[0] - p1[0]) * fraction;
-        const currentLng = p1[1] + (p2[1] - p1[1]) * fraction;
-        const currentPx = map.latLngToContainerPoint([currentLat, currentLng]);
+        const currentPx = activePose.tip;
 
         // Calculate heading bearing
-        const bearing = calculateBearing(p1[0], p1[1], p2[0], p2[1]);
+        const bearing = calculateBearing(
+          activePose.from[0],
+          activePose.from[1],
+          activePose.to[0],
+          activePose.to[1]
+        );
         const angleRad = toRad(bearing - 90); // Canvas 0 rad is along positive X-axis
 
         // Flight altitude parabolic curve
@@ -402,9 +563,10 @@ export const MapViewport: React.FC<MapViewportProps> = ({
   });
 
   // Re-render canvas overlay whenever playback, progress, or route changes
+  // (coalesced through scheduleRedraw so draws never duplicate camera frames)
   useEffect(() => {
-    drawOverlay();
-  }, [drawOverlay]);
+    scheduleRedraw();
+  }, [scheduleRedraw, homeBase, legs, activeLegIndex, legProgress, currentTimeMs]);
 
   return (
     <div className="relative flex-1 h-[calc(100vh-64px)] overflow-hidden bg-[#E2DBD0]">
