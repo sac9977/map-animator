@@ -45,6 +45,7 @@ export const TimelineController: React.FC<TimelineControllerProps> = ({
       <div className="flex items-center gap-3 shrink-0">
         <button
           onClick={onTogglePlay}
+          aria-label={isPlaying ? 'Pause animation' : 'Play animation'}
           className="w-11 h-11 rounded-2xl bg-[#0E6466] hover:bg-[#094749] text-white flex items-center justify-center shadow-md active:scale-95 transition-all"
           title={isPlaying ? 'Pause Animation' : 'Play Animation'}
         >
@@ -57,6 +58,7 @@ export const TimelineController: React.FC<TimelineControllerProps> = ({
 
         <button
           onClick={onReset}
+          aria-label="Replay from beginning"
           className="w-9 h-9 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 flex items-center justify-center transition-colors"
           title="Replay from Beginning"
         >
@@ -84,6 +86,7 @@ export const TimelineController: React.FC<TimelineControllerProps> = ({
             max="1"
             step="0.001"
             value={totalProgress}
+            aria-label="Journey timeline scrubber"
             onChange={(e) => onSeekTotal(parseFloat(e.target.value))}
             className="w-full h-2 bg-stone-200 rounded-lg appearance-none cursor-pointer accent-[#0E6466]"
           />

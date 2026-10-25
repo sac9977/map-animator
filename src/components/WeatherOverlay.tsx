@@ -5,6 +5,7 @@
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { useModalA11y } from '../hooks/useModalA11y';
 import {
   CloudSun,
   Thermometer,
@@ -45,6 +46,7 @@ export const WeatherOverlay: React.FC<WeatherOverlayProps> = ({
   endPoint,
 }) => {
   const [loading, setLoading] = useState<boolean>(true);
+  const dialogRef = useModalA11y(isOpen, onClose);
   const [error, setError] = useState<string | null>(null);
   const [startClimate, setStartClimate] = useState<LocationClimateSummary | null>(null);
   const [endClimate, setEndClimate] = useState<LocationClimateSummary | null>(null);
@@ -99,16 +101,8 @@ export const WeatherOverlay: React.FC<WeatherOverlayProps> = ({
     }
   }, [isOpen, startPoint.lat, startPoint.lng, endPoint.lat, endPoint.lng]);
 
-  // Handle ESC key to close
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) {
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
+  // Handle ESC key to close (the hook's capture-phase handler covers Escape,
+  // plus focus trap and focus restore — no separate listener needed here).
 
   // Unit conversion helpers
   const toTemp = (celsius: number): number => {
@@ -167,7 +161,13 @@ export const WeatherOverlay: React.FC<WeatherOverlayProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-3 md:p-6 animate-in fade-in duration-200">
-      <div className="bg-[#FAF8F5] border border-[#E6E1D7] w-full max-w-5xl max-h-[92vh] rounded-3xl shadow-2xl flex flex-col overflow-hidden text-stone-800 animate-in zoom-in-95 duration-200">
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="weather-modal-title"
+        className="bg-[#FAF8F5] border border-[#E6E1D7] w-full max-w-5xl max-h-[92vh] rounded-3xl shadow-2xl flex flex-col overflow-hidden text-stone-800 animate-in zoom-in-95 duration-200 outline-none"
+      >
         
         {/* Header Bar */}
         <div className="px-6 py-5 bg-[#FFFFFF] border-b border-[#E6E1D7] flex items-center justify-between gap-4 shrink-0">
@@ -177,7 +177,7 @@ export const WeatherOverlay: React.FC<WeatherOverlayProps> = ({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-base font-bold text-stone-900 tracking-tight">
+                <h2 id="weather-modal-title" className="text-base font-bold text-stone-900 tracking-tight">
                   Journey Weather & Climate Overlay
                 </h2>
                 <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#0E6466]/10 text-[#0E6466]">
@@ -196,6 +196,7 @@ export const WeatherOverlay: React.FC<WeatherOverlayProps> = ({
             <div className="flex items-center bg-stone-100 p-0.5 rounded-xl border border-stone-200 text-xs font-semibold">
               <button
                 onClick={() => setUnit('C')}
+                aria-pressed={unit === 'C'}
                 className={`px-2.5 py-1 rounded-lg transition-all ${
                   unit === 'C'
                     ? 'bg-[#0E6466] text-white shadow-xs'
@@ -206,6 +207,7 @@ export const WeatherOverlay: React.FC<WeatherOverlayProps> = ({
               </button>
               <button
                 onClick={() => setUnit('F')}
+                aria-pressed={unit === 'F'}
                 className={`px-2.5 py-1 rounded-lg transition-all ${
                   unit === 'F'
                     ? 'bg-[#0E6466] text-white shadow-xs'
@@ -221,6 +223,7 @@ export const WeatherOverlay: React.FC<WeatherOverlayProps> = ({
               onClick={loadWeatherData}
               disabled={loading}
               title="Refresh weather data"
+              aria-label="Refresh weather data"
               className="p-2 text-stone-500 hover:text-[#0E6466] rounded-xl hover:bg-stone-100 transition-colors disabled:opacity-40"
             >
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
@@ -229,6 +232,7 @@ export const WeatherOverlay: React.FC<WeatherOverlayProps> = ({
             {/* Close */}
             <button
               onClick={onClose}
+              aria-label="Close weather overlay"
               className="p-2 text-stone-400 hover:text-stone-700 rounded-xl hover:bg-stone-100 transition-colors"
             >
               <X className="w-5 h-5" />

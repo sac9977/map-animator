@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
+import { useModalA11y } from '../hooks/useModalA11y';
 import { X, Search, Check, RotateCcw, Sparkles } from 'lucide-react';
 import {
   TRAVELER_ICONS,
@@ -62,6 +63,8 @@ export const IconPickerModal: React.FC<IconPickerModalProps> = ({
     }
   }, [isOpen, currentIconId, currentMode]);
 
+  const dialogRef = useModalA11y(isOpen, onClose);
+
   const activeIconDef: TravelerIconDefinition = useMemo(() => {
     return getIconDefinition(activeTempId, currentMode);
   }, [activeTempId, currentMode]);
@@ -96,7 +99,11 @@ export const IconPickerModal: React.FC<IconPickerModalProps> = ({
   return createPortal(
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-4 bg-stone-900/65 backdrop-blur-xs animate-in fade-in duration-150">
       <div
-        className="bg-white border border-[#E6E1D7] rounded-3xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[85vh] sm:max-h-[88vh] overflow-hidden animate-in zoom-in-95 duration-150 relative z-[101]"
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="icon-picker-modal-title"
+        className="bg-white border border-[#E6E1D7] rounded-3xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[85vh] sm:max-h-[88vh] overflow-hidden animate-in zoom-in-95 duration-150 relative z-[101] outline-none"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -106,7 +113,10 @@ export const IconPickerModal: React.FC<IconPickerModalProps> = ({
               <Sparkles className="w-5 h-5 text-[#0E6466]" />
             </div>
             <div>
-              <h2 className="text-sm sm:text-base font-bold text-stone-900 tracking-tight">
+              <h2
+                id="icon-picker-modal-title"
+                className="text-sm sm:text-base font-bold text-stone-900 tracking-tight"
+              >
                 Vehicle & Traveler Icon
               </h2>
               <p className="text-[11px] sm:text-xs text-stone-500 line-clamp-1">
@@ -126,6 +136,7 @@ export const IconPickerModal: React.FC<IconPickerModalProps> = ({
             </button>
             <button
               onClick={onClose}
+              aria-label="Close icon picker"
               className="p-1.5 sm:p-2 text-stone-400 hover:text-stone-700 rounded-xl hover:bg-stone-200/50 transition-colors"
               title="Close dialog"
             >
@@ -225,6 +236,7 @@ export const IconPickerModal: React.FC<IconPickerModalProps> = ({
                       onClick={() => onUpdateColor(c)}
                       style={{ backgroundColor: c }}
                       title={`Vehicle: ${c}`}
+                      aria-label={`Vehicle color ${c}`}
                       className={`w-5 h-5 rounded-full border transition-all ${
                         currentColor.toLowerCase() === c.toLowerCase()
                           ? 'scale-120 border-stone-900 ring-2 ring-[#0E6466]/40 shadow-xs'
@@ -236,6 +248,7 @@ export const IconPickerModal: React.FC<IconPickerModalProps> = ({
                     <input
                       type="color"
                       value={currentColor}
+                      aria-label="Custom vehicle color"
                       onChange={(e) => onUpdateColor(e.target.value)}
                       className="opacity-0 absolute inset-0 cursor-pointer w-full h-full"
                     />
@@ -267,6 +280,7 @@ export const IconPickerModal: React.FC<IconPickerModalProps> = ({
                       onClick={() => onUpdateTrailColor(p.hex)}
                       style={{ backgroundColor: p.hex }}
                       title={`Trail: ${p.name} (${p.hex})`}
+                      aria-label={`Trail color ${p.name} (${p.hex})`}
                       className={`w-5 h-5 rounded-full border transition-all ${
                         currentTrailColor.toLowerCase() === p.hex.toLowerCase()
                           ? 'scale-120 border-stone-900 ring-2 ring-[#0E6466]/40 shadow-xs'
@@ -278,6 +292,7 @@ export const IconPickerModal: React.FC<IconPickerModalProps> = ({
                     <input
                       type="color"
                       value={currentTrailColor}
+                      aria-label="Custom trail color"
                       onChange={(e) => onUpdateTrailColor(e.target.value)}
                       className="opacity-0 absolute inset-0 cursor-pointer w-full h-full"
                     />
@@ -297,7 +312,7 @@ export const IconPickerModal: React.FC<IconPickerModalProps> = ({
               placeholder="Search icons (e.g. Backpacker, 4x4, Catamaran, Jet, Runner, Balloon)..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 text-xs bg-stone-50 border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0E6466]/30 focus:border-[#0E6466]"
+              className="w-full pl-10 pr-4 py-2 text-xs bg-stone-50 border border-stone-200 rounded-xl focus:border-[#0E6466]"
             />
             {searchQuery && (
               <button
@@ -333,11 +348,20 @@ export const IconPickerModal: React.FC<IconPickerModalProps> = ({
             {filteredIcons.map((icon) => {
               const isSelected = activeTempId === icon.id;
               return (
-                <div
+                <button
                   key={icon.id}
-                  onClick={() => setActiveTempId(icon.id)}
+                  type="button"
+                  onClick={() => {
+                    // Keyboard parity: pressing the already-selected tile applies it
+                    if (activeTempId === icon.id) {
+                      handleApply();
+                    } else {
+                      setActiveTempId(icon.id);
+                    }
+                  }}
                   onDoubleClick={handleApply}
-                  title="Click to select, double-click to apply"
+                  title="Click to select, click again or double-click to apply"
+                  aria-pressed={isSelected}
                   className={`relative p-3.5 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between ${
                     isSelected
                       ? 'bg-white border-[#0E6466] shadow-[0_4px_16px_-4px_rgba(14,100,102,0.2)] ring-2 ring-[#0E6466]'
@@ -374,19 +398,20 @@ export const IconPickerModal: React.FC<IconPickerModalProps> = ({
 
                   {/* Name & Tagline */}
                   <div>
-                    <h3
+                    {/* span (not heading): headings are not allowed inside buttons */}
+                    <span
                       className={`text-xs font-bold transition-colors ${
                         isSelected ? 'text-[#0E6466]' : 'text-stone-800'
                       }`}
                     >
                       {icon.name}
-                    </h3>
+                    </span>
                     <p className="text-[11px] text-stone-500 mt-0.5 leading-snug line-clamp-2">
                       {icon.tagline}
                     </p>
                   </div>
-                </div>
-              );
+                </button>
+                );
             })}
           </div>
 

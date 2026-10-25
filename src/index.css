@@ -77,6 +77,39 @@
   text-decoration: none !important;
 }
 
+/* Consistent visible focus ring across every interactive control (buttons,
+   sliders, swatches, color wells, links). Teal brand ring with a white halo
+   keeps it readable on light cards, dark bars, and over the map alike.
+   Modern browsers draw the outline following the element's border-radius. */
+@layer base {
+  :focus-visible {
+    outline: 2px solid #0E6466;
+    outline-offset: 2px;
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.85);
+  }
+}
+
+/* Respect prefers-reduced-motion: freeze looping/decorative animation
+   (spinners, pulses, radar rings, the spinning weather sun, entrance slides)
+   while keeping instantaneous visibility so nothing flashes or disappears. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .animate-spin,
+  .animate-pulse,
+  .animate-in,
+  .\[animate\:spin_12s_linear_infinite\] {
+    animation: none !important;
+  }
+}
+
 /* High-Contrast Cinematic Voyager Leaflet Theme */
 .leaflet-cinematic-sat-pane {
   filter: brightness(0.94) contrast(1.26) saturate(0.82) sepia(0.18) hue-rotate(-8deg);

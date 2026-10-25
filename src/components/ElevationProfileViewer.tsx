@@ -1,4 +1,12 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+
+/**
+ * Users with reduced-motion enabled get a static tracker dot instead of the
+ * SMIL pulse animation (SVG SMIL ignores the CSS media query, so this must be
+ * gated at render time).
+ */
+export const PREFERS_REDUCED_MOTION =
+  typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 import {
   Mountain,
   TrendingUp,
@@ -386,12 +394,12 @@ export const ElevationProfileViewer: React.FC<ElevationProfileViewerProps> = ({
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setHeightState('compact')}
-            className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-semibold transition-colors"
-            title="Expand Elevation Viewer"
-          >
+        <div className="flex items-center gap-2">            <button
+              onClick={() => setHeightState('compact')}
+              aria-label="Open elevation profile"
+              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-semibold transition-colors"
+              title="Expand Elevation Viewer"
+            >
             <ChevronUp className="w-3.5 h-3.5" />
             <span>Open Profile</span>
           </button>
@@ -429,6 +437,7 @@ export const ElevationProfileViewer: React.FC<ElevationProfileViewerProps> = ({
           <div className="flex items-center bg-stone-200/60 p-0.5 rounded-lg text-[11px] font-medium text-stone-600">
             <button
               onClick={() => setViewMode('active_leg')}
+              aria-pressed={viewMode === 'active_leg'}
               className={`px-2 py-0.5 rounded-md transition-colors ${
                 viewMode === 'active_leg'
                   ? 'bg-white text-stone-900 font-bold shadow-xs'
@@ -439,6 +448,7 @@ export const ElevationProfileViewer: React.FC<ElevationProfileViewerProps> = ({
             </button>
             <button
               onClick={() => setViewMode('entire_journey')}
+              aria-pressed={viewMode === 'entire_journey'}
               className={`px-2 py-0.5 rounded-md transition-colors ${
                 viewMode === 'entire_journey'
                   ? 'bg-white text-stone-900 font-bold shadow-xs'
@@ -603,6 +613,7 @@ export const ElevationProfileViewer: React.FC<ElevationProfileViewerProps> = ({
           {/* Expand / Minimize toggle */}
           <button
             onClick={() => setHeightState(heightState === 'expanded' ? 'compact' : 'expanded')}
+            aria-label={heightState === 'expanded' ? 'Compact elevation view' : 'Expand elevation view'}
             className="p-1.5 rounded-lg text-stone-500 hover:text-stone-800 hover:bg-stone-100 transition-colors"
             title={heightState === 'expanded' ? 'Compact View' : 'Expanded View'}
           >
@@ -612,6 +623,7 @@ export const ElevationProfileViewer: React.FC<ElevationProfileViewerProps> = ({
           {/* Collapse bar */}
           <button
             onClick={() => setHeightState('collapsed')}
+            aria-label="Collapse elevation profile"
             className="p-1.5 rounded-lg text-stone-500 hover:text-stone-800 hover:bg-stone-100 transition-colors"
             title="Collapse Elevation Profile"
           >
@@ -736,8 +748,12 @@ export const ElevationProfileViewer: React.FC<ElevationProfileViewerProps> = ({
 
                   {/* Pulsing Outer Radar Ring */}
                   <circle cx={svgData.trackerX} cy={svgData.trackerY} r="9" fill="#0E6466" fillOpacity="0.2">
-                    <animate attributeName="r" values="6;13;6" dur="2s" repeatCount="indefinite" />
-                    <animate attributeName="fill-opacity" values="0.3;0.05;0.3" dur="2s" repeatCount="indefinite" />
+                    {!PREFERS_REDUCED_MOTION && (
+                      <>
+                        <animate attributeName="r" values="6;13;6" dur="2s" repeatCount="indefinite" />
+                        <animate attributeName="fill-opacity" values="0.3;0.05;0.3" dur="2s" repeatCount="indefinite" />
+                      </>
+                    )}
                   </circle>
 
                   {/* Outer White Border Circle */}
@@ -849,6 +865,15 @@ export const ElevationProfileViewer: React.FC<ElevationProfileViewerProps> = ({
             </div>
           </div>
         )}
+      </div>
+
+      {/* Screen-reader live region: announces DEM extraction start/finish */}
+      <div role="status" aria-live="polite" className="sr-only">
+        {isFetchingDEM
+          ? 'Fetching real satellite terrain elevation data...'
+          : currentAnalysis?.source === 'dem_api'
+            ? 'Real satellite terrain elevation data loaded.'
+            : ''}
       </div>
     </div>
   );

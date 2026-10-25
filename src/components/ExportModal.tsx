@@ -4,6 +4,7 @@ import { AspectRatio, JourneyLeg, VideoExportConfig, VideoResolution, Waypoint }
 import { drawAnimatedVehicle } from '../utils/vehicleDrawers';
 import { calculateBearing, toRad } from '../utils/geoRouting';
 import { hexToRgba, getDefaultTrailColorForMode } from '../data/trailStyles';
+import { useModalA11y } from '../hooks/useModalA11y';
 
 interface ExportModalProps {
   isOpen: boolean;
@@ -48,6 +49,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   const [renderProgress, setRenderProgress] = useState(0);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const [downloadFilename, setDownloadFilename] = useState<string>('');
+  const dialogRef = useModalA11y(isOpen, onClose);
 
   if (!isOpen) return null;
 
@@ -280,7 +282,13 @@ export const ExportModal: React.FC<ExportModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
-      <div className="bg-[#FFFFFF] border border-[#E6E1D7] w-full max-w-xl rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="export-modal-title"
+        className="bg-[#FFFFFF] border border-[#E6E1D7] w-full max-w-xl rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 outline-none"
+      >
         {/* Modal Header */}
         <div className="px-6 py-4 border-b border-[#E6E1D7] bg-[#FAF8F5] flex items-center justify-between">
           <div className="flex items-center gap-2.5">
@@ -288,7 +296,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
               <Film className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-stone-900">Video Render Studio</h3>
+              <h3 id="export-modal-title" className="text-base font-bold text-stone-900">Video Render Studio</h3>
               <p className="text-xs text-stone-500">Configure resolution, aspect ratio, and frame rate</p>
             </div>
           </div>
@@ -296,6 +304,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
           <button
             onClick={onClose}
             disabled={isRendering}
+            aria-label="Close render studio"
             className="p-1.5 text-stone-400 hover:text-stone-700 rounded-xl hover:bg-stone-200/60 transition-colors"
           >
             <X className="w-5 h-5" />
@@ -320,6 +329,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                   key={ratio}
                   onClick={() => setAspectRatio(ratio)}
                   disabled={isRendering}
+                  aria-pressed={aspectRatio === ratio}
                   className={`p-3 rounded-2xl border text-center transition-all flex flex-col items-center justify-center gap-1 ${
                     aspectRatio === ratio
                       ? 'border-[#0E6466] bg-[#0E6466]/5 text-[#0E6466] ring-1 ring-[#0E6466]'
@@ -349,6 +359,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                   key={res}
                   onClick={() => setResolution(res)}
                   disabled={isRendering}
+                  aria-pressed={resolution === res}
                   className={`p-3 rounded-2xl border text-left transition-all ${
                     resolution === res
                       ? 'border-[#0E6466] bg-[#0E6466]/5 text-[#0E6466] ring-1 ring-[#0E6466]'
@@ -383,6 +394,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                   key={val}
                   onClick={() => setFps(val)}
                   disabled={isRendering}
+                  aria-pressed={fps === val}
                   className={`flex-1 p-2.5 rounded-xl border flex items-center justify-between text-xs font-semibold ${
                     fps === val
                       ? 'border-[#0E6466] bg-[#0E6466]/5 text-[#0E6466] ring-1 ring-[#0E6466]'
@@ -398,7 +410,10 @@ export const ExportModal: React.FC<ExportModalProps> = ({
 
           {/* Render Progress or Download Button */}
           {isRendering ? (
-            <div className="bg-[#FAF8F5] border border-[#E6E1D7] rounded-2xl p-4 space-y-2">
+            <div
+              aria-live="polite"
+              className="bg-[#FAF8F5] border border-[#E6E1D7] rounded-2xl p-4 space-y-2"
+            >
               <div className="flex items-center justify-between text-xs font-bold text-stone-700">
                 <span className="flex items-center gap-2">
                   <Loader2 className="w-4 h-4 animate-spin text-[#0E6466]" />
@@ -406,7 +421,14 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                 </span>
                 <span className="font-mono-numbers text-[#0E6466]">{renderProgress}%</span>
               </div>
-              <div className="w-full h-2 bg-stone-200 rounded-full overflow-hidden">
+              <div
+                role="progressbar"
+                aria-label="Video render progress"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={renderProgress}
+                className="w-full h-2 bg-stone-200 rounded-full overflow-hidden"
+              >
                 <div
                   className="h-full bg-[#0E6466] transition-all duration-150"
                   style={{ width: `${renderProgress}%` }}
@@ -417,7 +439,11 @@ export const ExportModal: React.FC<ExportModalProps> = ({
               </p>
             </div>
           ) : downloadUrl ? (
-            <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-center justify-between">
+            <div
+              role="status"
+              aria-live="polite"
+              className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-center justify-between"
+            >
               <div className="flex items-center gap-3">
                 <CheckCircle className="w-6 h-6 text-emerald-600" />
                 <div>

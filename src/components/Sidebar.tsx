@@ -26,6 +26,8 @@ import {
   Eye,
   EyeOff,
   Palette,
+  AlertTriangle,
+  X,
 } from 'lucide-react';
 import { JourneyLeg, TransportMode, Waypoint } from '../types/travel';
 import { searchAirports } from '../data/airports';
@@ -111,6 +113,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [showGPXPanel, setShowGPXPanel] = useState(false);
   const [isDraggingGPX, setIsDraggingGPX] = useState(false);
   const [gpxSuccessMessage, setGpxSuccessMessage] = useState<string | null>(null);
+  const [gpxErrorMessage, setGpxErrorMessage] = useState<string | null>(null);
   const gpxFileInputRef = useRef<HTMLInputElement>(null);
 
   // New leg creator state
@@ -240,7 +243,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const processGPXData = (xmlText: string, filename: string, targetLegIndex?: number) => {
     const parsed: ParsedGPXResult = parseGPX(xmlText);
     if (!parsed.points || parsed.points.length < 2) {
-      alert('The selected GPX file does not contain valid track points (<trkpt> or <rtept>).');
+      // Announced via a live region instead of a blocking alert()
+      setGpxErrorMessage('The selected GPX file does not contain valid track points (<trkpt> or <rtept>).');
       return;
     }
 
@@ -332,7 +336,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   };
 
   // Drop GPX file
-  const handleGPXDrop = (e: React.DragEvent<HTMLDivElement>) => {
+  const handleGPXDrop = (e: React.DragEvent<HTMLElement>) => {
     e.preventDefault();
     setIsDraggingGPX(false);
     const file = e.dataTransfer.files?.[0];
@@ -425,7 +429,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   placeholder="Search city, airport code (e.g. JRO, JFK)..."
                   value={homeQuery}
                   onChange={(e) => handleSearchHome(e.target.value)}
-                  className="w-full pl-9 pr-3 py-1.5 text-xs bg-stone-50 border border-stone-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#0E6466]"
+                  className="w-full pl-9 pr-3 py-1.5 text-xs bg-stone-50 border border-stone-200 rounded-lg"
                 />
               </div>
 
@@ -441,7 +445,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <Crosshair className="w-3 h-3" />
                   <span>{isPickingLocation === 'home' ? 'Click map now...' : 'Pick on Map'}</span>
                 </button>
-                {isSearchingHome && <span className="text-[10px] text-stone-400 animate-pulse">Searching...</span>}
+                {isSearchingHome && (
+                  <span
+                    role="status"
+                    aria-live="polite"
+                    className="text-[10px] text-stone-400 animate-pulse"
+                  >
+                    Searching...
+                  </span>
+                )}
               </div>
 
               {homeResults.length > 0 && (
@@ -498,11 +510,34 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </button>
         </div>
 
-        {/* Success toast after GPX parsed */}
+        {/* Success toast after GPX parsed (announced via live region) */}
         {gpxSuccessMessage && (
-          <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl px-3 py-2 text-xs flex items-center gap-2 animate-in fade-in">
+          <div
+            role="status"
+            aria-live="polite"
+            className="bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl px-3 py-2 text-xs flex items-center gap-2 animate-in fade-in"
+          >
             <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
             <span className="truncate font-medium">{gpxSuccessMessage}</span>
+          </div>
+        )}
+
+        {/* GPX parse error (announced immediately via live region) */}
+        {gpxErrorMessage && (
+          <div
+            role="alert"
+            className="bg-red-50 border border-red-200 text-red-800 rounded-xl px-3 py-2 text-xs flex items-start gap-2 animate-in fade-in"
+          >
+            <AlertTriangle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+            <span className="font-medium flex-1">{gpxErrorMessage}</span>
+            <button
+              type="button"
+              onClick={() => setGpxErrorMessage(null)}
+              aria-label="Dismiss error"
+              className="text-red-400 hover:text-red-700 shrink-0"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
           </div>
         )}
 
@@ -523,7 +558,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
 
             {/* Drag & Drop Zone */}
-            <div
+            <button
+              type="button"
               onDragOver={(e) => {
                 e.preventDefault();
                 setIsDraggingGPX(true);
@@ -551,7 +587,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onChange={(e) => handleGPXFileInput(e)}
                 className="hidden"
               />
-            </div>
+            </button>
 
             {/* Or load sample GPX */}
             <div>
@@ -729,7 +765,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   placeholder="Type city, national park, airport (e.g. Serengeti, ZNZ)..."
                   value={destQuery}
                   onChange={(e) => handleSearchDest(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 text-xs bg-stone-50 border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#0E6466] focus:bg-white transition-all font-medium"
+                  className="w-full pl-9 pr-3 py-2 text-xs bg-stone-50 border border-stone-200 rounded-xl focus:bg-white transition-all font-medium"
                 />
               </div>
             </div>
@@ -775,13 +811,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </button>
 
             {isSearchingDest && (
-              <p className="text-[11px] text-stone-400 animate-pulse text-center">
+              <p role="status" aria-live="polite" className="text-[11px] text-stone-400 animate-pulse text-center">
                 Searching airports & OpenStreetMap...
               </p>
             )}
 
             {isCalculatingRoute && (
-              <p className="text-[11px] text-[#0E6466] font-semibold animate-pulse text-center">
+              <p role="status" aria-live="polite" className="text-[11px] text-[#0E6466] font-semibold animate-pulse text-center">
                 Calculating authentic route path...
               </p>
             )}
@@ -844,7 +880,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
           return (
             <div
               key={leg.id}
+              role="button"
+              tabIndex={0}
+              aria-pressed={isSelected}
               onClick={() => onSelectLeg(index)}
+              onKeyDown={(e) => {
+                // Whole-card trigger: the card contains nested controls, so it
+                // can't be a native <button> — give it identical keyboard semantics.
+                if ((e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget) {
+                  e.preventDefault();
+                  onSelectLeg(index);
+                }
+              }}
               className={`bg-white border rounded-2xl p-3.5 transition-all cursor-pointer ${
                 isSelected
                   ? 'border-[#0E6466] shadow-[0_4px_16px_-4px_rgba(14,100,102,0.18)] ring-1 ring-[#0E6466]/40'
@@ -869,6 +916,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     onRemoveLeg(index);
                   }}
                   title="Remove this leg"
+                  aria-label={`Remove leg ${index + 1}`}
                   className="p-1 text-stone-400 hover:text-red-500 rounded-lg hover:bg-red-50 transition-colors"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
@@ -923,13 +971,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
               {(() => {
                 const iconDef = getIconDefinition(leg.customIconId, leg.mode);
                 return (
-                  <div
+                  <button
+                    type="button"
                     onClick={(e) => {
                       e.stopPropagation();
                       setIconPickerLegIndex(index);
                     }}
-                    className="mb-3 p-2 rounded-xl bg-stone-50 hover:bg-[#0E6466]/5 border border-stone-200 hover:border-[#0E6466] transition-all flex items-center justify-between cursor-pointer group"
-                    title="Click to change vehicle or traveler icon"
+                    className="w-full text-left mb-3 p-2 rounded-xl bg-stone-50 hover:bg-[#0E6466]/5 border border-stone-200 hover:border-[#0E6466] transition-all flex items-center justify-between cursor-pointer group"
+                    title="Change vehicle or traveler icon"
                   >
                     <div className="flex items-center gap-2 min-w-0">
                       <div className="w-8 h-8 rounded-lg flex items-center justify-center border border-stone-200 bg-white shadow-2xs shrink-0">
@@ -956,7 +1005,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     <span className="text-[10px] font-semibold text-[#0E6466] bg-white px-2 py-0.5 rounded-md border border-stone-200 shadow-2xs group-hover:border-[#0E6466] shrink-0 ml-1">
                       Change
                     </span>
-                  </div>
+                  </button>
                 );
               })()}
 
@@ -1103,6 +1152,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           }}
                           style={{ backgroundColor: p.hex }}
                           title={`Trail: ${p.name} (${p.hex})`}
+                          aria-label={`Trail color ${p.name} (${p.hex})`}
                           className={`w-4 h-4 rounded-full border transition-all ${
                             isSelected
                               ? 'scale-125 border-stone-900 ring-2 ring-[#0E6466]/40 shadow-xs'
@@ -1121,6 +1171,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       <input
                         type="color"
                         value={leg.trailColor || '#F59E0B'}
+                        aria-label="Custom trail color"
                         onChange={(e) => {
                           e.stopPropagation();
                           onUpdateLeg(index, { trailColor: e.target.value });
@@ -1182,6 +1233,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           }}
                           style={{ backgroundColor: color }}
                           title={`Vehicle: ${color}`}
+                          aria-label={`Vehicle color ${color}`}
                           className={`w-3.5 h-3.5 rounded-full border transition-transform ${
                             leg.vehicleColor === color ? 'scale-125 border-stone-900 ring-1 ring-stone-900/30' : 'border-stone-200 hover:scale-110'
                           }`}
@@ -1195,6 +1247,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         <input
                           type="color"
                           value={leg.vehicleColor}
+                          aria-label="Custom vehicle color"
                           onChange={(e) => {
                             e.stopPropagation();
                             onUpdateLeg(index, { vehicleColor: e.target.value });

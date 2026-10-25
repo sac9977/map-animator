@@ -16,6 +16,69 @@ import { ElevationProfileViewer } from './components/ElevationProfileViewer';
 import { JourneyLeg, Waypoint } from './types/travel';
 import { PRESET_JOURNEYS, JourneyPreset } from './data/presetJourneys';
 import { calculateCatmullRomSpline, fetchRoadRoute } from './utils/geoRouting';
+import { useModalA11y } from './hooks/useModalA11y';
+
+/**
+ * Clear-journey confirmation dialog (extracted so it can own its own a11y wiring).
+ */
+const ClearJourneyConfirmModal: React.FC<{
+  legsCount: number;
+  onClose: () => void;
+  onConfirm: () => void;
+}> = ({ legsCount, onClose, onConfirm }) => {
+  const dialogRef = useModalA11y(true, onClose);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+      <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="clear-confirm-modal-title"
+        className="bg-[#FFFFFF] border border-[#E6E1D7] w-full max-w-md rounded-3xl shadow-2xl overflow-hidden p-6 space-y-5 animate-in zoom-in-95 duration-150 outline-none"
+      >
+        <div className="flex items-start justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center">
+              <AlertTriangle className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 id="clear-confirm-modal-title" className="text-base font-bold text-stone-900">Clear Entire Journey?</h3>
+              <p className="text-xs text-stone-500">Reset itinerary to a clean blank canvas</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            aria-label="Close without clearing"
+            className="p-1.5 text-stone-400 hover:text-stone-700 rounded-xl hover:bg-stone-100 transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <p className="text-sm text-stone-600 leading-relaxed">
+          This will remove all <strong className="text-stone-900">{legsCount} journey {legsCount === 1 ? 'leg' : 'legs'}</strong> and reset the route so you can start plotting your own expedition from scratch.
+        </p>
+
+        <div className="flex items-center justify-end gap-3 pt-2">
+          <button
+            onClick={onClose}
+            className="px-4 py-2.5 rounded-xl border border-stone-200 text-xs font-semibold text-stone-700 hover:bg-stone-50 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-semibold shadow-sm transition-all active:scale-95"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            <span>Yes, Clear Journey</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export default function App() {
   // Initial default to Tanzania Safari preset
@@ -413,47 +476,11 @@ export default function App() {
 
       {/* Clear Journey Confirmation Modal */}
       {isClearConfirmOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-150">
-          <div className="bg-[#FFFFFF] border border-[#E6E1D7] w-full max-w-md rounded-3xl shadow-2xl overflow-hidden p-6 space-y-5 animate-in zoom-in-95 duration-150">
-            <div className="flex items-start justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center">
-                  <AlertTriangle className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-stone-900">Clear Entire Journey?</h3>
-                  <p className="text-xs text-stone-500">Reset itinerary to a clean blank canvas</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setIsClearConfirmOpen(false)}
-                className="p-1.5 text-stone-400 hover:text-stone-700 rounded-xl hover:bg-stone-100 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <p className="text-sm text-stone-600 leading-relaxed">
-              This will remove all <strong className="text-stone-900">{legs.length} journey {legs.length === 1 ? 'leg' : 'legs'}</strong> and reset the route so you can start plotting your own expedition from scratch.
-            </p>
-
-            <div className="flex items-center justify-end gap-3 pt-2">
-              <button
-                onClick={() => setIsClearConfirmOpen(false)}
-                className="px-4 py-2.5 rounded-xl border border-stone-200 text-xs font-semibold text-stone-700 hover:bg-stone-50 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleConfirmClearJourney}
-                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-semibold shadow-sm transition-all active:scale-95"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span>Yes, Clear Journey</span>
-              </button>
-            </div>
-          </div>
-        </div>
+        <ClearJourneyConfirmModal
+          legsCount={legs.length}
+          onClose={() => setIsClearConfirmOpen(false)}
+          onConfirm={handleConfirmClearJourney}
+        />
       )}
     </div>
   );
