@@ -180,7 +180,7 @@ export const WeatherOverlay: React.FC<WeatherOverlayProps> = ({
                 <h2 id="weather-modal-title" className="text-base font-bold text-stone-900 tracking-tight">
                   Journey Weather & Climate Overlay
                 </h2>
-                <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#0E6466]/10 text-[#0E6466]">
+                <span className="text-xs font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#0E6466]/10 text-[#0E6466]">
                   Open-Meteo Archive
                 </span>
               </div>
@@ -247,13 +247,13 @@ export const WeatherOverlay: React.FC<WeatherOverlayProps> = ({
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white border border-[#E6E1D7] shadow-xs">
               <span className="w-2.5 h-2.5 rounded-full bg-[#0E6466]" />
               <div className="flex flex-col">
-                <span className="text-[10px] uppercase font-bold text-stone-400">Origin</span>
+                <span className="text-xs uppercase font-bold text-stone-400">Origin</span>
                 <span className="font-semibold text-stone-800">
                   {startPoint.name} {startPoint.country ? `(${startPoint.country})` : ''}
                 </span>
               </div>
               {startClimate?.elevation !== undefined && (
-                <span className="text-[10px] text-stone-500 bg-stone-100 px-1.5 py-0.5 rounded ml-1 font-mono">
+                <span className="text-xs text-stone-500 bg-stone-100 px-1.5 py-0.5 rounded ml-1 font-mono">
                   {startClimate.elevation}m
                 </span>
               )}
@@ -266,13 +266,13 @@ export const WeatherOverlay: React.FC<WeatherOverlayProps> = ({
                 <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white border border-[#E6E1D7] shadow-xs">
                   <span className="w-2.5 h-2.5 rounded-full bg-[#D97706]" />
                   <div className="flex flex-col">
-                    <span className="text-[10px] uppercase font-bold text-stone-400">Destination</span>
+                    <span className="text-xs uppercase font-bold text-stone-400">Destination</span>
                     <span className="font-semibold text-stone-800">
                       {endPoint.name} {endPoint.country ? `(${endPoint.country})` : ''}
                     </span>
                   </div>
                   {endClimate?.elevation !== undefined && (
-                    <span className="text-[10px] text-stone-500 bg-stone-100 px-1.5 py-0.5 rounded ml-1 font-mono">
+                    <span className="text-xs text-stone-500 bg-stone-100 px-1.5 py-0.5 rounded ml-1 font-mono">
                       {endClimate.elevation}m
                     </span>
                   )}
@@ -702,7 +702,7 @@ const TemperatureSvgChart: React.FC<TempChartProps> = ({
                 x={paddingLeft - 8}
                 y={y + 3}
                 textAnchor="end"
-                className="text-[10px] fill-stone-400 font-mono"
+                className="text-xs fill-stone-400 font-mono"
               >
                 {tickVal}°
               </text>
@@ -770,7 +770,7 @@ const TemperatureSvgChart: React.FC<TempChartProps> = ({
                   x={x}
                   y={height - paddingBottom + 16}
                   textAnchor="middle"
-                  className="text-[10px] fill-stone-500 font-medium"
+                  className="text-xs fill-stone-500 font-medium"
                 >
                   {label}
                 </text>
@@ -1029,7 +1029,7 @@ const PrecipitationSvgChart: React.FC<PrecipChartProps> = ({
                 x={paddingLeft - 8}
                 y={y + 3}
                 textAnchor="end"
-                className="text-[10px] fill-stone-400 font-mono"
+                className="text-xs fill-stone-400 font-mono"
               >
                 {tickVal}{unitLabel}
               </text>
@@ -1073,7 +1073,7 @@ const PrecipitationSvgChart: React.FC<PrecipChartProps> = ({
                   x={slotX + barSlotWidth / 2}
                   y={height - paddingBottom + 16}
                   textAnchor="middle"
-                  className="text-[10px] fill-stone-500 font-medium"
+                  className="text-xs fill-stone-500 font-medium"
                 >
                   {label}
                 </text>
@@ -1164,7 +1164,7 @@ const PrecipitationSvgChart: React.FC<PrecipChartProps> = ({
                       (startItems[hoveredIndex] as DailyWeatherData).precipitation
                   )} {unitLabel}
                   {isMonthly && (
-                    <span className="text-[10px] text-stone-400 font-normal ml-1">
+                    <span className="text-xs text-stone-400 font-normal ml-1">
                       ({(startItems[hoveredIndex] as MonthlyClimateData).rainyDays} rain days)
                     </span>
                   )}
@@ -1184,7 +1184,7 @@ const PrecipitationSvgChart: React.FC<PrecipChartProps> = ({
                       (endItems[hoveredIndex] as DailyWeatherData).precipitation
                   )} {unitLabel}
                   {isMonthly && (
-                    <span className="text-[10px] text-stone-400 font-normal ml-1">
+                    <span className="text-xs text-stone-400 font-normal ml-1">
                       ({(endItems[hoveredIndex] as MonthlyClimateData).rainyDays} rain days)
                     </span>
                   )}
@@ -1232,7 +1232,7 @@ const LocationSummaryCard: React.FC<LocationCardProps> = ({
             style={{ backgroundColor: color }}
           />
           <div>
-            <span className="text-[10px] font-bold uppercase tracking-wider text-stone-400 block">
+            <span className="text-xs font-bold uppercase tracking-wider text-stone-400 block">
               {label}
             </span>
             <h4 className="text-sm font-bold text-stone-900 tracking-tight">
@@ -1251,21 +1251,21 @@ const LocationSummaryCard: React.FC<LocationCardProps> = ({
       <div className="grid grid-cols-2 gap-3 text-xs">
         {/* Annual Precipitation */}
         <div className="p-3 rounded-xl bg-stone-50 border border-stone-100 space-y-1">
-          <span className="text-[10px] uppercase font-bold text-stone-400 flex items-center gap-1">
+          <span className="text-xs uppercase font-bold text-stone-400 flex items-center gap-1">
             <CloudRain className="w-3 h-3 text-blue-500" />
             Annual Rainfall
           </span>
           <p className="text-base font-bold text-stone-900 font-mono">
             {toPrecip(summary.annualPrecipitation)} {precipUnit}
           </p>
-          <span className="text-[10px] text-stone-500">
+          <span className="text-xs text-stone-500">
             Peak: {summary.wettestMonth.month} ({toPrecip(summary.wettestMonth.precip)} {precipUnit})
           </span>
         </div>
 
         {/* Thermal Range */}
         <div className="p-3 rounded-xl bg-stone-50 border border-stone-100 space-y-1">
-          <span className="text-[10px] uppercase font-bold text-stone-400 flex items-center gap-1">
+          <span className="text-xs uppercase font-bold text-stone-400 flex items-center gap-1">
             <Thermometer className="w-3 h-3 text-orange-500" />
             Thermal Extreme
           </span>
@@ -1273,21 +1273,21 @@ const LocationSummaryCard: React.FC<LocationCardProps> = ({
             {toTemp(summary.hottestMonth.temp)}{tempUnit}{' '}
             <span className="text-xs font-normal text-stone-400">high</span>
           </p>
-          <span className="text-[10px] text-stone-500">
+          <span className="text-xs text-stone-500">
             Low: {toTemp(summary.coldestMonth.temp)}{tempUnit} ({summary.coldestMonth.month})
           </span>
         </div>
 
         {/* Elevation */}
         <div className="p-3 rounded-xl bg-stone-50 border border-stone-100 space-y-1">
-          <span className="text-[10px] uppercase font-bold text-stone-400 flex items-center gap-1">
+          <span className="text-xs uppercase font-bold text-stone-400 flex items-center gap-1">
             <Mountain className="w-3 h-3 text-emerald-600" />
             Elevation
           </span>
           <p className="text-base font-bold text-stone-900 font-mono">
             {summary.elevation !== undefined ? `${summary.elevation} m` : 'Sea level'}
           </p>
-          <span className="text-[10px] text-stone-500">
+          <span className="text-xs text-stone-500">
             {summary.elevation !== undefined && summary.elevation > 1500
               ? 'High-altitude expedition terrain'
               : 'Lowland / Maritime terrain'}
@@ -1296,14 +1296,14 @@ const LocationSummaryCard: React.FC<LocationCardProps> = ({
 
         {/* Coordinates */}
         <div className="p-3 rounded-xl bg-stone-50 border border-stone-100 space-y-1">
-          <span className="text-[10px] uppercase font-bold text-stone-400 flex items-center gap-1">
+          <span className="text-xs uppercase font-bold text-stone-400 flex items-center gap-1">
             <Compass className="w-3 h-3 text-stone-500" />
             Coordinates
           </span>
           <p className="text-xs font-bold text-stone-800 font-mono pt-1">
             {summary.lat.toFixed(2)}°, {summary.lng.toFixed(2)}°
           </p>
-          <span className="text-[10px] text-stone-500">
+          <span className="text-xs text-stone-500">
             Driest month: {summary.driestMonth.month}
           </span>
         </div>

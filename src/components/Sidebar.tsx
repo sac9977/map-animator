@@ -426,6 +426,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <Search className="w-4 h-4 text-stone-400 absolute left-3 top-2.5" />
                 <input
                   type="text"
+                  aria-label="Search for a new home base (city or airport code)"
                   placeholder="Search city, airport code (e.g. JRO, JFK)..."
                   value={homeQuery}
                   onChange={(e) => handleSearchHome(e.target.value)}
@@ -449,7 +450,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <span
                     role="status"
                     aria-live="polite"
-                    className="text-[10px] text-stone-400 animate-pulse"
+                    className="text-xs text-stone-400 animate-pulse"
                   >
                     Searching...
                   </span>
@@ -471,7 +472,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     >
                       <span className="font-medium text-stone-800 truncate">{result.name}</span>
                       {result.airportCode && (
-                        <span className="text-[10px] bg-stone-100 text-[#0E6466] font-mono px-1.5 py-0.5 rounded">
+                        <span className="text-xs bg-stone-100 text-[#0E6466] font-mono px-1.5 py-0.5 rounded">
                           {result.airportCode}
                         </span>
                       )}
@@ -591,7 +592,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             {/* Or load sample GPX */}
             <div>
-              <p className="text-[10px] font-bold text-stone-400 uppercase tracking-wider mb-1.5">
+              <p className="text-xs font-bold text-stone-400 uppercase tracking-wider mb-1.5">
                 Or Try Sample Expedition Tracks:
               </p>
               <div className="space-y-1.5">
@@ -605,9 +606,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       <span className="text-xs font-semibold text-stone-800 group-hover:text-[#0E6466] block">
                         {sample.title}
                       </span>
-                      <span className="text-[10px] text-stone-500">{sample.location}</span>
+                      <span className="text-xs text-stone-500">{sample.location}</span>
                     </div>
-                    <span className="text-[10px] font-bold text-[#0E6466] bg-white px-2 py-0.5 rounded border border-stone-200">
+                    <span className="text-xs font-bold text-[#0E6466] bg-white px-2 py-0.5 rounded border border-stone-200">
                       Load
                     </span>
                   </button>
@@ -632,7 +633,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <span className="text-xs font-bold text-[#0E6466] uppercase tracking-wider block">
                     New Expedition Leg 0{legs.length + 1}
                   </span>
-                  <span className="text-[10px] text-stone-500">
+                  <span className="text-xs text-stone-500">
                     Departing from: <strong className="text-stone-800">{departurePoint.name.split('(')[0]}</strong>
                   </span>
                 </div>
@@ -647,7 +648,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             {/* Transport Mode Selection */}
             <div>
-              <p className="text-[10px] font-bold text-stone-500 uppercase tracking-wider mb-1.5">
+              <p className="text-xs font-bold text-stone-500 uppercase tracking-wider mb-1.5">
                 Mode of Transport
               </p>
               <div className="grid grid-cols-5 gap-1 p-1 bg-stone-100 rounded-xl mb-1.5">
@@ -658,7 +659,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       setNewLegMode(mode);
                       setNewLegIconId(getDefaultIconIdForMode(mode));
                     }}
-                    className={`flex flex-col items-center justify-center py-1.5 rounded-lg text-[10px] font-medium transition-all ${
+                    className={`flex flex-col items-center justify-center py-1.5 rounded-lg text-xs font-medium transition-all ${
                       newLegMode === mode
                         ? 'bg-[#0E6466] text-white shadow-xs'
                         : 'text-stone-600 hover:text-stone-900 hover:bg-white/50'
@@ -677,7 +678,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       setNewLegMode(mode);
                       setNewLegIconId(getDefaultIconIdForMode(mode));
                     }}
-                    className={`flex flex-col items-center justify-center py-1 rounded-lg text-[10px] font-medium transition-all ${
+                    className={`flex flex-col items-center justify-center py-1 rounded-lg text-xs font-medium transition-all ${
                       newLegMode === mode
                         ? 'bg-[#0E6466] text-white shadow-xs'
                         : 'text-stone-600 hover:text-stone-900 hover:bg-white/50'
@@ -703,7 +704,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           <span className="text-[11px] font-bold text-stone-800 block leading-tight truncate">
                             {iconDef.name}
                           </span>
-                          <span className="text-[10px] text-stone-400">
+                          <span className="text-xs text-stone-400">
                             {iconDef.badge} · Custom Map Icon
                           </span>
                         </div>
@@ -711,7 +712,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       <button
                         type="button"
                         onClick={() => setIconPickerLegIndex('new')}
-                        className="text-[10px] font-semibold text-[#0E6466] bg-white hover:bg-[#0E6466]/5 px-2 py-0.5 rounded-md border border-stone-200 shadow-2xs transition-all shrink-0 ml-1"
+                        className="text-xs font-semibold text-[#0E6466] bg-white hover:bg-[#0E6466]/5 px-2 py-0.5 rounded-md border border-stone-200 shadow-2xs transition-all shrink-0 ml-1"
                       >
                         Change Icon & Colors
                       </button>
@@ -721,7 +722,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     <div className="pt-1.5 border-t border-stone-200/60 flex items-center justify-between text-xs">
                       <div className="flex items-center gap-1.5">
                         <Route className="w-3 h-3 text-[#0E6466]" />
-                        <span className="text-[10px] uppercase font-bold text-stone-500">Trail:</span>
+                        <span className="text-xs uppercase font-bold text-stone-500">Trail:</span>
                         <div className="flex items-center gap-1">
                           {TRAIL_COLOR_PRESETS.slice(0, 5).map((p) => (
                             <button
@@ -735,17 +736,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
                               }`}
                             />
                           ))}
-                          <label className="relative w-3.5 h-3.5 rounded-full border border-stone-300 flex items-center justify-center cursor-pointer overflow-hidden bg-gradient-to-tr from-cyan-400 via-amber-400 to-indigo-500" title="Custom Trail Color">
+                          <label className="relative w-6 h-6 rounded-full border border-stone-300 flex items-center justify-center cursor-pointer overflow-hidden bg-gradient-to-tr from-cyan-400 via-amber-400 to-indigo-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-[#0E6466] focus-within:ring-offset-2" title="Custom Trail Color">
                             <input
                               type="color"
                               value={newLegTrailColor}
+                              aria-label="Custom trail color for new leg"
                               onChange={(e) => setNewLegTrailColor(e.target.value)}
                               className="opacity-0 absolute inset-0 cursor-pointer w-full h-full"
                             />
                           </label>
                         </div>
                       </div>
-                      <span className="font-mono text-[9px] text-stone-400">{newLegTrailColor}</span>
+                      <span className="font-mono text-xs text-stone-400">{newLegTrailColor}</span>
                     </div>
                   </div>
                 );
@@ -754,7 +756,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             {/* Destination Search Box */}
             <div>
-              <p className="text-[10px] font-bold text-stone-500 uppercase tracking-wider mb-1.5">
+              <p className="text-xs font-bold text-stone-500 uppercase tracking-wider mb-1.5">
                 Destination Point
               </p>
               <div className="relative">
@@ -762,6 +764,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <input
                   ref={destInputRef}
                   type="text"
+                  aria-label="Search destination point"
                   placeholder="Type city, national park, airport (e.g. Serengeti, ZNZ)..."
                   value={destQuery}
                   onChange={(e) => handleSearchDest(e.target.value)}
@@ -772,7 +775,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
             {/* Quick 1-Click Suggestion Chips */}
             <div>
-              <span className="text-[10px] text-stone-400 block mb-1">Quick Suggestions:</span>
+              <span className="text-xs text-stone-400 block mb-1">Quick Suggestions:</span>
               <div className="flex flex-wrap gap-1.5">
                 {popularSuggestions.map((sug) => (
                   <button
@@ -787,7 +790,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         airportCode: sug.airportCode,
                       })
                     }
-                    className="text-[10px] bg-stone-100 hover:bg-[#0E6466]/10 hover:text-[#0E6466] text-stone-700 px-2 py-1 rounded-lg border border-stone-200 transition-colors font-medium"
+                    className="text-xs bg-stone-100 hover:bg-[#0E6466]/10 hover:text-[#0E6466] text-stone-700 px-2 py-1 rounded-lg border border-stone-200 transition-colors font-medium"
                   >
                     + {sug.name.split(' (')[0]}
                   </button>
@@ -834,11 +837,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     <div>
                       <span className="font-semibold text-stone-800 block">{result.name}</span>
                       {result.country && (
-                        <span className="text-[10px] text-stone-400">{result.country}</span>
+                        <span className="text-xs text-stone-400">{result.country}</span>
                       )}
                     </div>
                     {result.airportCode && (
-                      <span className="text-[10px] bg-stone-100 text-[#0E6466] font-mono px-1.5 py-0.5 rounded">
+                      <span className="text-xs bg-stone-100 text-[#0E6466] font-mono px-1.5 py-0.5 rounded">
                         {result.airportCode}
                       </span>
                     )}
@@ -901,7 +904,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               {/* Leg Header Strip */}
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-[#0E6466] font-mono-numbers">
+                  <span className="text-xs font-bold uppercase tracking-wider text-[#0E6466] font-mono-numbers">
                     Leg 0{index + 1}
                   </span>
                   <span className="text-stone-300">·</span>
@@ -933,7 +936,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       handleChangeMode(index, mode);
                     }}
                     title={label}
-                    className={`flex flex-col items-center justify-center py-1.5 rounded-lg text-[10px] font-medium transition-all ${
+                    className={`flex flex-col items-center justify-center py-1.5 rounded-lg text-xs font-medium transition-all ${
                       leg.mode === mode
                         ? 'bg-[#0E6466] text-white shadow-xs'
                         : 'text-stone-600 hover:text-stone-900 hover:bg-white/50'
@@ -955,7 +958,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       handleChangeMode(index, mode);
                     }}
                     title={label}
-                    className={`flex flex-col items-center justify-center py-1 rounded-lg text-[10px] font-medium transition-all ${
+                    className={`flex flex-col items-center justify-center py-1 rounded-lg text-xs font-medium transition-all ${
                       leg.mode === mode
                         ? 'bg-[#0E6466] text-white shadow-xs'
                         : 'text-stone-600 hover:text-stone-900 hover:bg-white/50'
@@ -993,16 +996,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           <span className="text-[11px] font-bold text-stone-800 group-hover:text-[#0E6466] leading-tight truncate">
                             {iconDef.name}
                           </span>
-                          <span className="text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.2 bg-stone-200/60 text-stone-600 rounded shrink-0">
+                          <span className="text-xs uppercase font-bold tracking-wider px-1.5 py-0.2 bg-stone-200/60 text-stone-600 rounded shrink-0">
                             {iconDef.badge}
                           </span>
                         </div>
-                        <span className="text-[10px] text-stone-400 block truncate max-w-[190px]">
+                        <span className="text-xs text-stone-400 block truncate max-w-[190px]">
                           {iconDef.tagline}
                         </span>
                       </div>
                     </div>
-                    <span className="text-[10px] font-semibold text-[#0E6466] bg-white px-2 py-0.5 rounded-md border border-stone-200 shadow-2xs group-hover:border-[#0E6466] shrink-0 ml-1">
+                    <span className="text-xs font-semibold text-[#0E6466] bg-white px-2 py-0.5 rounded-md border border-stone-200 shadow-2xs group-hover:border-[#0E6466] shrink-0 ml-1">
                       Change
                     </span>
                   </button>
@@ -1018,7 +1021,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       <span>Wilderness Hiking Track</span>
                     </p>
                     {trekStats?.sourceType === 'gpx' && (
-                      <span className="text-[9px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.5 rounded font-mono">
+                      <span className="text-xs bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.5 rounded font-mono">
                         GPX Track
                       </span>
                     )}
@@ -1029,7 +1032,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     <div className="mt-2 grid grid-cols-2 gap-1.5 text-[11px]">
                       {trekStats.totalDistanceKm !== undefined && (
                         <div className="bg-white/90 p-1.5 rounded-lg border border-stone-200">
-                          <span className="text-stone-400 block text-[9px] uppercase font-semibold">Distance</span>
+                          <span className="text-stone-400 block text-xs uppercase font-semibold">Distance</span>
                           <span className="font-bold text-stone-800 font-mono-numbers">
                             {trekStats.totalDistanceKm} km
                           </span>
@@ -1037,7 +1040,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       )}
                       {trekStats.elevationGainMeters !== undefined && trekStats.elevationGainMeters > 0 && (
                         <div className="bg-white/90 p-1.5 rounded-lg border border-stone-200">
-                          <span className="text-stone-400 block text-[9px] uppercase font-semibold">Elev Gain</span>
+                          <span className="text-stone-400 block text-xs uppercase font-semibold">Elev Gain</span>
                           <span className="font-bold text-[#0E6466] font-mono-numbers">
                             +{trekStats.elevationGainMeters}m
                           </span>
@@ -1045,7 +1048,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       )}
                       {trekStats.minElevation !== undefined && trekStats.maxElevation !== undefined && (
                         <div className="bg-white/90 p-1.5 rounded-lg border border-stone-200 col-span-2 flex justify-between items-center">
-                          <span className="text-stone-400 text-[10px]">Altitude Range:</span>
+                          <span className="text-stone-400 text-xs">Altitude Range:</span>
                           <span className="font-semibold text-stone-800 font-mono-numbers">
                             {trekStats.minElevation}m → {trekStats.maxElevation}m
                           </span>
@@ -1097,7 +1100,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5">
                       <Route className="w-3.5 h-3.5 text-[#0E6466]" />
-                      <span className="text-[10px] uppercase font-bold tracking-wider text-stone-700">
+                      <span className="text-xs uppercase font-bold tracking-wider text-stone-700">
                         Trail Color
                       </span>
                       <span
@@ -1113,7 +1116,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           e.stopPropagation();
                           onUpdateLeg(index, { trailColor: leg.vehicleColor });
                         }}
-                        className="text-[10px] font-semibold text-[#0E6466] hover:underline"
+                        className="text-xs font-semibold text-[#0E6466] hover:underline"
                         title="Match trail color with vehicle accent"
                       >
                         Match Vehicle
@@ -1125,7 +1128,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           e.stopPropagation();
                           onUpdateLeg(index, { showTrail: leg.showTrail === false ? true : false });
                         }}
-                        className={`px-1.5 py-0.5 rounded-md text-[10px] font-semibold flex items-center gap-1 transition-colors ${
+                        className={`px-1.5 py-0.5 rounded-md text-xs font-semibold flex items-center gap-1 transition-colors ${
                           leg.showTrail !== false
                             ? 'text-[#0E6466] bg-[#0E6466]/10'
                             : 'text-stone-400 bg-stone-200/60'
@@ -1133,7 +1136,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         title={leg.showTrail !== false ? 'Hide animated trail path on map' : 'Show animated trail path on map'}
                       >
                         {leg.showTrail !== false ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3 text-stone-400" />}
-                        <span className="text-[9px]">{leg.showTrail !== false ? 'Trail On' : 'Hidden'}</span>
+                        <span className="text-xs">{leg.showTrail !== false ? 'Trail On' : 'Hidden'}</span>
                       </button>
                     </div>
                   </div>
@@ -1165,7 +1168,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     {/* Custom Hex Color Picker */}
                     <label
                       onClick={(e) => e.stopPropagation()}
-                      className="relative w-4 h-4 rounded-full border border-stone-300 flex items-center justify-center cursor-pointer hover:scale-110 transition-transform overflow-hidden bg-gradient-to-tr from-cyan-400 via-amber-400 to-indigo-500 shadow-2xs"
+                      className="relative w-6 h-6 rounded-full border border-stone-300 flex items-center justify-center cursor-pointer hover:scale-110 transition-transform overflow-hidden bg-gradient-to-tr from-cyan-400 via-amber-400 to-indigo-500 shadow-2xs focus-within:outline-none focus-within:ring-2 focus-within:ring-[#0E6466] focus-within:ring-offset-2"
                       title="Custom Trail Hex Color"
                     >
                       <input
@@ -1182,8 +1185,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   </div>
 
                   {/* Mini Trail Preview Strip */}
-                  <div className="pt-1 flex items-center justify-between text-[10px] text-stone-400 border-t border-stone-200/50 mt-1">
-                    <span className="font-mono text-[9px] text-stone-500 font-medium">
+                  <div className="pt-1 flex items-center justify-between text-xs text-stone-400 border-t border-stone-200/50 mt-1">
+                    <span className="font-mono text-xs text-stone-500 font-medium">
                       {leg.trailColor || '#F59E0B'}
                     </span>
                     <div className="flex-1 max-w-[130px] mx-2 h-2.5 flex items-center">
@@ -1209,7 +1212,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         />
                       </svg>
                     </div>
-                    <span className="text-[9px] uppercase font-bold text-[#0E6466]">
+                    <span className="text-xs uppercase font-bold text-[#0E6466]">
                       {leg.mode === 'flight' ? 'Flight Arc' : leg.mode === 'hike' ? 'Trek Dotted' : 'Road Solid'}
                     </span>
                   </div>
@@ -1219,7 +1222,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <div className="flex items-center justify-between gap-3 pt-0.5">
                   {/* Vehicle Accent Color */}
                   <div className="flex flex-col gap-1">
-                    <span className="text-[9px] uppercase font-bold tracking-wider text-stone-500">
+                    <span className="text-xs uppercase font-bold tracking-wider text-stone-500">
                       Vehicle Color
                     </span>
                     <div className="flex items-center gap-1">
@@ -1241,7 +1244,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       ))}
                       <label
                         onClick={(e) => e.stopPropagation()}
-                        className="relative w-3.5 h-3.5 rounded-full border border-stone-300 flex items-center justify-center cursor-pointer hover:scale-110 transition-transform overflow-hidden bg-gradient-to-tr from-amber-400 via-rose-400 to-teal-500 shadow-2xs"
+                        className="relative w-6 h-6 rounded-full border border-stone-300 flex items-center justify-center cursor-pointer hover:scale-110 transition-transform overflow-hidden bg-gradient-to-tr from-amber-400 via-rose-400 to-teal-500 shadow-2xs focus-within:outline-none focus-within:ring-2 focus-within:ring-[#0E6466] focus-within:ring-offset-2"
                         title="Custom Vehicle Color"
                       >
                         <input
@@ -1260,11 +1263,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
                   {/* Duration Slider */}
                   <div className="flex flex-col items-end gap-1">
-                    <span className="text-[9px] uppercase font-bold tracking-wider text-stone-500">
+                    <span className="text-xs uppercase font-bold tracking-wider text-stone-500">
                       Duration · <span className="font-mono text-stone-700 font-semibold">{leg.durationSeconds}s</span>
                     </span>
                     <input
                       type="range"
+                      aria-label={`Journey duration, leg ${leg.to.name.split('(')[0]}`}
                       min="3"
                       max="18"
                       step="1"
@@ -1381,7 +1385,7 @@ function ElevationProfileSparkline({
 
   return (
     <div className="mt-2 p-2 bg-white rounded-lg border border-stone-200">
-      <div className="flex justify-between text-[9px] text-stone-400 font-mono-numbers mb-1">
+      <div className="flex justify-between text-xs text-stone-400 font-mono-numbers mb-1">
         <span>Min {minEle}m</span>
         <span className="font-bold text-[#0E6466]">Elevation Profile</span>
         <span>Max {maxEle}m</span>

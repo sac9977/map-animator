@@ -13,6 +13,36 @@ interface ExportModalProps {
   legs: JourneyLeg[];
 }
 
+// Real basemap layers composited into the export background — mirrors the app's
+// default 'Cinematic Voyager' style (satellite imagery + hillshade + labels).
+// Both Esri endpoints send permissive CORS headers, so we can draw them
+// cross-origin into the recording canvas (crossOrigin='anonymous').
+const EXPORT_TILE_LAYERS: { url: string; opacity: number }[] = [
+  {
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    opacity: 1,
+  },
+  {
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/{z}/{y}/{x}',
+    opacity: 0.72,
+  },
+  {
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
+    opacity: 0.85,
+  },
+];
+
+const TILE_SIZE = 256;
+const MAX_TILES_PER_LAYER = 72;
+
+// Web-Mercator helpers (same projection the Leaflet map uses, so tiles align
+// exactly with route geometry drawn on the export canvas)
+const lngToGlobalPx = (lng: number, worldSize: number) => ((lng + 180) / 360) * worldSize;
+const latToGlobalPx = (lat: number, worldSize: number) => {
+  const s = Math.max(-0.9999, Math.min(0.9999, Math.sin(toRad(lat))));
+  return (0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI)) * worldSize;
+};
+
 const RESOLUTION_DIMS: Record<AspectRatio, Record<VideoResolution, { width: number; height: number }>> = {
   '16:9': {
     '4K': { width: 3840, height: 2160 },
@@ -93,22 +123,105 @@ export const ExportModal: React.FC<ExportModalProps> = ({
       maxLng = Math.max(maxLng, lng);
     });
 
-    // Add 15% padding
+    // Add 30% padding
     const latSpan = Math.max(0.05, (maxLat - minLat) * 1.3);
     const lngSpan = Math.max(0.05, (maxLng - minLng) * 1.3);
     const centerLat = (minLat + maxLat) / 2;
     const centerLng = (minLng + maxLng) / 2;
+    const topLat = Math.max(-85, Math.min(85, centerLat + latSpan / 2));
+    const bottomLat = Math.max(-85, Math.min(85, centerLat - latSpan / 2));
+    const leftLng = centerLng - lngSpan / 2;
+    const rightLng = centerLng + lngSpan / 2;
 
-    const latToY = (lat: number) => {
-      const norm = (lat - (centerLat - latSpan / 2)) / latSpan;
-      return currentDims.height - norm * currentDims.height;
-    };
-    const lngToX = (lng: number) => {
-      const norm = (lng - (centerLng - lngSpan / 2)) / lngSpan;
-      return norm * currentDims.width;
-    };
+    // Pick the highest tile zoom whose whole padded bbox fits the tile budget
+    let zoom = 3;
+    for (let z = 3; z <= 11; z++) {
+      const ws = TILE_SIZE * Math.pow(2, z);
+      const nx =
+        Math.floor(lngToGlobalPx(rightLng, ws) / TILE_SIZE) -
+        Math.floor(lngToGlobalPx(leftLng, ws) / TILE_SIZE) +
+        1;
+      const ny =
+        Math.floor(latToGlobalPx(bottomLat, ws) / TILE_SIZE) -
+        Math.floor(latToGlobalPx(topLat, ws) / TILE_SIZE) +
+        1;
+      if (nx * ny > MAX_TILES_PER_LAYER) break;
+      zoom = z;
+    }
 
-    // Preload satellite/topographic background tiles or draw high-res cartographic backdrop
+    // Uniform Web-Mercator framing so route geometry lands exactly on the tiles
+    const worldSize = TILE_SIZE * Math.pow(2, zoom);
+    const gxLeft = lngToGlobalPx(leftLng, worldSize);
+    const gyTop = latToGlobalPx(topLat, worldSize);
+    const worldPxSpanX = lngToGlobalPx(rightLng, worldSize) - gxLeft;
+    const worldPxSpanY = latToGlobalPx(bottomLat, worldSize) - gyTop;
+    const mapScale = Math.min(currentDims.width / worldPxSpanX, currentDims.height / worldPxSpanY);
+    const mapOffsetX = (currentDims.width - worldPxSpanX * mapScale) / 2;
+    const mapOffsetY = (currentDims.height - worldPxSpanY * mapScale) / 2;
+
+    const latToY = (lat: number) =>
+      mapOffsetY + (latToGlobalPx(lat, worldSize) - gyTop) * mapScale;
+    const lngToX = (lng: number) =>
+      mapOffsetX + (lngToGlobalPx(lng, worldSize) - gxLeft) * mapScale;
+
+    // --- Preload & composite the real basemap into an offscreen background canvas ---
+    const bgCanvas = document.createElement('canvas');
+    bgCanvas.width = currentDims.width;
+    bgCanvas.height = currentDims.height;
+    const bctx = bgCanvas.getContext('2d');
+    if (bctx) {
+      bctx.fillStyle = '#EBE5DA'; // fallback if tiles fail to load
+      bctx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
+
+      const tx0 = Math.max(0, Math.floor(gxLeft / TILE_SIZE));
+      const ty0 = Math.max(0, Math.floor(gyTop / TILE_SIZE));
+      const tx1 = Math.min(
+        Math.pow(2, zoom) - 1,
+        Math.floor((gxLeft + worldPxSpanX) / TILE_SIZE)
+      );
+      const ty1 = Math.min(
+        Math.pow(2, zoom) - 1,
+        Math.floor((gyTop + worldPxSpanY) / TILE_SIZE)
+      );
+
+      const loadTile = async (
+        layerUrl: string,
+        tx: number,
+        ty: number
+      ): Promise<HTMLImageElement | null> =>
+        new Promise((resolve) => {
+          const img = new Image();
+          img.crossOrigin = 'anonymous';
+          img.onload = () => resolve(img);
+          img.onerror = () => resolve(null);
+          img.src = layerUrl
+            .replace('{z}', String(zoom))
+            .replace('{y}', String(ty))
+            .replace('{x}', String(tx));
+        });
+
+      for (const layer of EXPORT_TILE_LAYERS) {
+        const jobs: Promise<void>[] = [];
+        for (let ty = ty0; ty <= ty1; ty++) {
+          for (let tx = tx0; tx <= tx1; tx++) {
+            jobs.push(
+              (async () => {
+                const img = await loadTile(layer.url, tx, ty);
+                if (!img) return;
+                const px = mapOffsetX + (tx * TILE_SIZE - gxLeft) * mapScale;
+                const py = mapOffsetY + (ty * TILE_SIZE - gyTop) * mapScale;
+                const size = TILE_SIZE * mapScale + 1; // +1px avoids seam gaps
+                bctx.globalAlpha = layer.opacity;
+                bctx.drawImage(img, px, py, size, size);
+              })()
+            );
+          }
+        }
+        await Promise.all(jobs);
+      }
+      bctx.globalAlpha = 1;
+    }
+
     const stream = canvas.captureStream(fps);
     const mimeType = MediaRecorder.isTypeSupported('video/mp4')
       ? 'video/mp4'
@@ -139,34 +252,15 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     };
 
     recorder.start();
+    const startedAt = performance.now();
 
     // Render frame by frame
     for (let frame = 0; frame <= totalFrames; frame++) {
       const progress = frame / totalFrames;
       const currentTimeSec = progress * duration;
 
-      // Draw warm cartographic background
-      ctx.fillStyle = '#EBE5DA';
-      ctx.fillRect(0, 0, currentDims.width, currentDims.height);
-
-      // Topographic contours simulation
-      ctx.strokeStyle = 'rgba(14, 100, 102, 0.05)';
-      ctx.lineWidth = 2;
-      for (let r = 80; r < Math.max(currentDims.width, currentDims.height); r += 90) {
-        ctx.beginPath();
-        ctx.arc(currentDims.width / 2, currentDims.height / 2, r, 0, Math.PI * 2);
-        ctx.stroke();
-      }
-
-      // Compass Rose watermark in corner
-      ctx.save();
-      ctx.translate(currentDims.width - 100, 100);
-      ctx.strokeStyle = 'rgba(14, 100, 102, 0.2)';
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.arc(0, 0, 45, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.restore();
+      // Real composited basemap (static across frames — drawn once before capture)
+      ctx.drawImage(bgCanvas, 0, 0);
 
       // Find active leg based on elapsed time
       let accumulatedTime = 0;
@@ -270,10 +364,20 @@ export const ExportModal: React.FC<ExportModalProps> = ({
       ctx.font = `500 ${Math.round(currentDims.width * 0.014)}px "JetBrains Mono", monospace`;
       ctx.fillText(`ANIMATED WITH MAPANIMATOR · ${currentDims.width}x${currentDims.height} @ ${fps}FPS`, 60, currentDims.height - 40);
 
+      // Pace frames in real time: MediaRecorder records wall-clock time, so
+      // drawing all frames as fast as possible compresses the whole journey
+      // into a few seconds. Waiting for the frame's real timestamp keeps the
+      // exported video's duration equal to the journey's actual duration.
+      const targetMs = startedAt + (frame * 1000) / fps;
+      const wait = targetMs - performance.now();
+      if (wait > 0) {
+        await new Promise((r) => setTimeout(r, wait));
+      }
+
       // Report render progress
       if (frame % 5 === 0) {
         setRenderProgress(Math.round((frame / totalFrames) * 100));
-        await new Promise((r) => setTimeout(r, 8));
+        await new Promise((r) => setTimeout(r, 0));
       }
     }
 
@@ -338,7 +442,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                 >
                   <Icon className="w-4 h-4 mb-0.5" />
                   <span className="text-xs font-bold">{ratio}</span>
-                  <span className="text-[10px] text-stone-400">{sub}</span>
+                  <span className="text-xs text-stone-400">{sub}</span>
                 </button>
               ))}
             </div>
@@ -372,7 +476,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                       {badge}
                     </span>
                   </div>
-                  <span className="text-[10px] text-stone-400 font-mono-numbers">
+                  <span className="text-xs text-stone-400 font-mono-numbers">
                     {RESOLUTION_DIMS[aspectRatio][res].width} × {RESOLUTION_DIMS[aspectRatio][res].height}
                   </span>
                 </button>
@@ -402,7 +506,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                   }`}
                 >
                   <span>{label}</span>
-                  <span className="text-[10px] text-stone-400 font-normal">{desc}</span>
+                  <span className="text-xs text-stone-400 font-normal">{desc}</span>
                 </button>
               ))}
             </div>
@@ -434,7 +538,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                   style={{ width: `${renderProgress}%` }}
                 />
               </div>
-              <p className="text-[10px] text-stone-400 text-center">
+              <p className="text-xs text-stone-400 text-center">
                 Rendering {currentDims.width}x{currentDims.height} @ {fps}fps with synchronized camera easing
               </p>
             </div>

@@ -70,7 +70,7 @@ export const TimelineController: React.FC<TimelineControllerProps> = ({
           <span className="text-xs font-bold text-stone-800 font-mono-numbers">
             {currentTimeFormatted} <span className="text-stone-400 font-normal">/ {totalTimeFormatted}</span>
           </span>
-          <span className="text-[10px] font-medium text-stone-500 uppercase tracking-wider">
+          <span className="text-xs font-medium text-stone-500 uppercase tracking-wider">
             {activeLeg ? `Leg ${activeLegIndex + 1}: ${activeLeg.mode.toUpperCase()}` : 'Ready'}
           </span>
         </div>
@@ -93,7 +93,7 @@ export const TimelineController: React.FC<TimelineControllerProps> = ({
         </div>
 
         {/* Leg Waypoint Segment Indicators along the timeline */}
-        <div className="flex justify-between items-center mt-1 px-1 text-[10px] font-medium text-stone-400">
+        <div className="flex justify-between items-center mt-1 px-1 text-xs font-medium text-stone-400">
           <span>Start</span>
           {legs.map((leg, i) => (
             <span

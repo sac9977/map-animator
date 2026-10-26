@@ -462,7 +462,7 @@ export const ElevationProfileViewer: React.FC<ElevationProfileViewerProps> = ({
           {/* Source tag */}
           {currentAnalysis && (
             <span
-              className={`text-[10px] font-semibold px-2 py-0.5 rounded-md ${
+              className={`text-xs font-semibold px-2 py-0.5 rounded-md ${
                 currentAnalysis.source === 'gpx'
                   ? 'bg-amber-100 text-amber-800 border border-amber-200'
                   : currentAnalysis.source === 'dem_api'
@@ -484,7 +484,7 @@ export const ElevationProfileViewer: React.FC<ElevationProfileViewerProps> = ({
           {/* Current Altitude (Live synced!) */}
           <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#0E6466]/10 text-[#0E6466] border border-[#0E6466]/20">
             <span className="w-2 h-2 rounded-full bg-[#0E6466] animate-pulse" />
-            <span className="text-[10px] uppercase font-sans font-bold text-[#0E6466]">Live Alt:</span>
+            <span className="text-xs uppercase font-sans font-bold text-[#0E6466]">Live Alt:</span>
             <span className="font-bold text-xs">{formatElevation(liveStats.elevationMeters)}</span>
           </div>
 
@@ -496,7 +496,7 @@ export const ElevationProfileViewer: React.FC<ElevationProfileViewerProps> = ({
                 title="Cumulative Elevation Gain"
               >
                 <ArrowUpRight className="w-3.5 h-3.5" />
-                <span className="text-[10px] uppercase font-sans text-stone-400">Gain:</span>
+                <span className="text-xs uppercase font-sans text-stone-400">Gain:</span>
                 <span>+{formatElevation(currentAnalysis.elevationGainMeters)}</span>
               </div>
 
@@ -506,21 +506,21 @@ export const ElevationProfileViewer: React.FC<ElevationProfileViewerProps> = ({
                 title="Cumulative Elevation Loss"
               >
                 <ArrowDownRight className="w-3.5 h-3.5" />
-                <span className="text-[10px] uppercase font-sans text-stone-400">Loss:</span>
+                <span className="text-xs uppercase font-sans text-stone-400">Loss:</span>
                 <span>-{formatElevation(currentAnalysis.elevationLossMeters)}</span>
               </div>
 
               {/* Peak Summit */}
               <div className="flex items-center gap-1 text-amber-800 font-semibold" title="Peak Max Elevation">
                 <Mountain className="w-3 h-3 text-amber-600" />
-                <span className="text-[10px] uppercase font-sans text-stone-400">Peak:</span>
+                <span className="text-xs uppercase font-sans text-stone-400">Peak:</span>
                 <span>{formatElevation(currentAnalysis.maxElevationMeters)}</span>
               </div>
 
               {/* Live Grade / Slope */}
               <div className="flex items-center gap-1 text-stone-600 font-semibold" title="Instantaneous Slope Grade">
                 <Gauge className="w-3 h-3 text-stone-400" />
-                <span className="text-[10px] uppercase font-sans text-stone-400">Grade:</span>
+                <span className="text-xs uppercase font-sans text-stone-400">Grade:</span>
                 <span className={liveStats.gradePercent > 0 ? 'text-amber-700' : 'text-stone-700'}>
                   {liveStats.gradePercent > 0 ? `+${liveStats.gradePercent}%` : `${liveStats.gradePercent}%`}
                 </span>
@@ -545,7 +545,7 @@ export const ElevationProfileViewer: React.FC<ElevationProfileViewerProps> = ({
 
             {isGPXDropdownOpen && (
               <div className="absolute right-0 top-full mt-1.5 w-64 bg-white border border-[#E6E1D7] rounded-2xl shadow-xl p-2 z-50 text-xs animate-in fade-in zoom-in-95 duration-100">
-                <div className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider text-stone-400 border-b border-stone-100 mb-1">
+                <div className="px-2 py-1.5 text-xs font-bold uppercase tracking-wider text-stone-400 border-b border-stone-100 mb-1">
                   Extract Terrain from GPX
                 </div>
 
@@ -560,7 +560,7 @@ export const ElevationProfileViewer: React.FC<ElevationProfileViewerProps> = ({
                   <Upload className="w-4 h-4 text-amber-600" />
                   <div>
                     <div className="font-semibold text-stone-800">Upload GPX File</div>
-                    <div className="text-[10px] text-stone-400">Extract tracks, heights & waypoints</div>
+                    <div className="text-xs text-stone-400">Extract tracks, heights & waypoints</div>
                   </div>
                 </button>
 
@@ -576,11 +576,11 @@ export const ElevationProfileViewer: React.FC<ElevationProfileViewerProps> = ({
                   <RefreshCw className={`w-4 h-4 text-emerald-600 ${isFetchingDEM ? 'animate-spin' : ''}`} />
                   <div>
                     <div className="font-semibold text-stone-800">Fetch Real Satellite DEM</div>
-                    <div className="text-[10px] text-stone-400">Copernicus 90m terrain elevation</div>
+                    <div className="text-xs text-stone-400">Copernicus 90m terrain elevation</div>
                   </div>
                 </button>
 
-                <div className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider text-stone-400 border-t border-stone-100 mt-1 mb-0.5">
+                <div className="px-2 py-1.5 text-xs font-bold uppercase tracking-wider text-stone-400 border-t border-stone-100 mt-1 mb-0.5">
                   Load Authentic GPX Track
                 </div>
 
@@ -593,7 +593,7 @@ export const ElevationProfileViewer: React.FC<ElevationProfileViewerProps> = ({
                     <Mountain className="w-3.5 h-3.5 text-stone-400 mt-0.5 shrink-0" />
                     <div className="min-w-0">
                       <div className="font-semibold text-stone-800 truncate">{sample.title}</div>
-                      <div className="text-[10px] text-stone-400 truncate">{sample.location}</div>
+                      <div className="text-xs text-stone-400 truncate">{sample.location}</div>
                     </div>
                   </button>
                 ))}
@@ -810,9 +810,9 @@ export const ElevationProfileViewer: React.FC<ElevationProfileViewerProps> = ({
                 <div className="flex flex-col">
                   <div className="flex items-center gap-1.5">
                     <span className="font-bold text-amber-400">{formatElevation(hoverPosition.elevationMeters)}</span>
-                    <span className="text-stone-400 text-[10px]">({formatDistance(hoverPosition.distanceKm)})</span>
+                    <span className="text-stone-400 text-xs">({formatDistance(hoverPosition.distanceKm)})</span>
                   </div>
-                  <span className="text-[10px] text-stone-300 font-sans">
+                  <span className="text-xs text-stone-300 font-sans">
                     Slope:{' '}
                     <strong className={hoverPosition.gradePercent > 0 ? 'text-amber-300' : 'text-stone-300'}>
                       {hoverPosition.gradePercent > 0 ? `+${hoverPosition.gradePercent}%` : `${hoverPosition.gradePercent}%`}

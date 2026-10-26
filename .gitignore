@@ -9,3 +9,7 @@ coverage/
 .aistudio/
 .vite/
 dev-dist/
+# Rendered videos / local dev artifacts stay out of version control
+out/
+*.mp4
+contact-sheet/

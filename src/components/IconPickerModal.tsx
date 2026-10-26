@@ -182,7 +182,7 @@ export const IconPickerModal: React.FC<IconPickerModalProps> = ({
               <div>
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-bold text-stone-900">{activeIconDef.name}</span>
-                  <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-[#0E6466]/10 text-[#0E6466]">
+                  <span className="text-xs uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-[#0E6466]/10 text-[#0E6466]">
                     {activeIconDef.badge}
                   </span>
                 </div>
@@ -204,9 +204,10 @@ export const IconPickerModal: React.FC<IconPickerModalProps> = ({
             {/* Scale Slider */}
             {onUpdateScale && (
               <div className="flex items-center gap-1.5 bg-white px-2.5 py-1.5 rounded-xl border border-stone-200 shadow-2xs self-end sm:self-center">
-                <span className="text-[10px] font-bold text-stone-400 uppercase">Scale</span>
+                <span className="text-xs font-bold text-stone-400 uppercase">Scale</span>
                 <input
                   type="range"
+                  aria-label="Vehicle icon scale"
                   min="0.8"
                   max="2.0"
                   step="0.1"
@@ -226,7 +227,7 @@ export const IconPickerModal: React.FC<IconPickerModalProps> = ({
             {/* Vehicle Color Swatches */}
             {onUpdateColor && (
               <div className="flex flex-col gap-1">
-                <span className="text-[10px] uppercase font-bold tracking-wider text-stone-500">
+                <span className="text-xs uppercase font-bold tracking-wider text-stone-500">
                   Vehicle Accent Color
                 </span>
                 <div className="flex items-center gap-1.5">
@@ -244,7 +245,7 @@ export const IconPickerModal: React.FC<IconPickerModalProps> = ({
                       }`}
                     />
                   ))}
-                  <label className="relative w-5 h-5 rounded-full border border-stone-300 flex items-center justify-center cursor-pointer hover:scale-110 transition-transform overflow-hidden bg-gradient-to-tr from-amber-400 via-rose-400 to-teal-500" title="Custom vehicle color">
+                  <label className="relative w-6 h-6 rounded-full border border-stone-300 flex items-center justify-center cursor-pointer hover:scale-110 transition-transform overflow-hidden bg-gradient-to-tr from-amber-400 via-rose-400 to-teal-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-[#0E6466] focus-within:ring-offset-2" title="Custom vehicle color">
                     <input
                       type="color"
                       value={currentColor}
@@ -261,13 +262,13 @@ export const IconPickerModal: React.FC<IconPickerModalProps> = ({
             {onUpdateTrailColor && (
               <div className="flex flex-col gap-1">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-[10px] uppercase font-bold tracking-wider text-stone-500">
+                  <span className="text-xs uppercase font-bold tracking-wider text-stone-500">
                     Route Trail Color
                   </span>
                   {onUpdateColor && (
                     <button
                       onClick={() => onUpdateTrailColor(currentColor)}
-                      className="text-[10px] font-semibold text-[#0E6466] hover:underline"
+                      className="text-xs font-semibold text-[#0E6466] hover:underline"
                     >
                       Match Vehicle
                     </button>
@@ -288,7 +289,7 @@ export const IconPickerModal: React.FC<IconPickerModalProps> = ({
                       }`}
                     />
                   ))}
-                  <label className="relative w-5 h-5 rounded-full border border-stone-300 flex items-center justify-center cursor-pointer hover:scale-110 transition-transform overflow-hidden bg-gradient-to-tr from-cyan-400 via-amber-400 to-indigo-500" title="Custom trail color">
+                  <label className="relative w-6 h-6 rounded-full border border-stone-300 flex items-center justify-center cursor-pointer hover:scale-110 transition-transform overflow-hidden bg-gradient-to-tr from-cyan-400 via-amber-400 to-indigo-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-[#0E6466] focus-within:ring-offset-2" title="Custom trail color">
                     <input
                       type="color"
                       value={currentTrailColor}

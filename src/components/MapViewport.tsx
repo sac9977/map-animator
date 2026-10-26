@@ -605,11 +605,11 @@ export const MapViewport: React.FC<MapViewportProps> = ({
           <div className="flex items-baseline gap-1.5">
             <span className="text-xl font-bold text-stone-900 font-mono-numbers">27°</span>
             <span className="text-xs font-semibold text-stone-500">Sunny</span>
-            <span className="text-[10px] text-[#0E6466] font-bold bg-[#0E6466]/10 px-1.5 py-0.5 rounded-md ml-1 opacity-80 group-hover:opacity-100">
+            <span className="text-xs text-[#0E6466] font-bold bg-[#0E6466]/10 px-1.5 py-0.5 rounded-md ml-1 opacity-80 group-hover:opacity-100">
               Climate
             </span>
           </div>
-          <p className="text-[10px] text-stone-400 font-medium">Voyager Imagery · Click for Historical Data</p>
+          <p className="text-xs text-stone-400 font-medium">Voyager Imagery · Click for Historical Data</p>
         </div>
       </button>
 

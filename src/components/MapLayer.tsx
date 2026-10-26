@@ -191,7 +191,7 @@ export const MapLayer: React.FC<MapLayerProps> = ({
       >
         <CurrentIcon className="w-4 h-4 text-[#0E6466]" />
         <span>{currentTheme.name}</span>
-        <span className="text-[10px] text-[#F59E0B] font-mono font-bold bg-[#FAF8F5] px-1 rounded border border-[#E6E1D7]">
+        <span className="text-xs text-[#F59E0B] font-mono font-bold bg-[#FAF8F5] px-1 rounded border border-[#E6E1D7]">
           {activeStyle === 'cinematic-voyager' ? 'HD Voyager' : 'Layer'}
         </span>
       </button>
@@ -200,10 +200,10 @@ export const MapLayer: React.FC<MapLayerProps> = ({
       {isOpen && (
         <div className="mt-2 bg-white/95 backdrop-blur-md border border-[#E6E1D7] rounded-2xl shadow-xl p-2 w-72 divide-y divide-stone-100 animate-in fade-in zoom-in-95 duration-150">
           <div className="px-2 py-1.5 mb-1 flex items-center justify-between">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-[#0E6466]">
+            <span className="text-xs font-bold uppercase tracking-wider text-[#0E6466]">
               Cartography Themes
             </span>
-            <span className="text-[10px] text-stone-400 font-mono">Zero API Keys</span>
+            <span className="text-xs text-stone-400 font-mono">Zero API Keys</span>
           </div>
 
           <div className="space-y-1 pt-1">
@@ -237,7 +237,7 @@ export const MapLayer: React.FC<MapLayerProps> = ({
                       <span className="text-xs font-bold block leading-tight">
                         {theme.name}
                       </span>
-                      <span className="text-[10px] text-stone-500 block leading-tight mt-0.5">
+                      <span className="text-xs text-stone-500 block leading-tight mt-0.5">
                         {theme.subtitle}
                       </span>
                     </div>
