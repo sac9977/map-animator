@@ -17,23 +17,39 @@ interface ExportModalProps {
 // default 'Cinematic Voyager' style (satellite imagery + hillshade + labels).
 // Both Esri endpoints send permissive CORS headers, so we can draw them
 // cross-origin into the recording canvas (crossOrigin='anonymous').
-const EXPORT_TILE_LAYERS: { url: string; opacity: number }[] = [
+const EXPORT_TILE_LAYERS: { url: string; opacity: number; maxZoom: number }[] = [
   {
     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
     opacity: 1,
+    maxZoom: 19,
   },
   {
     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/{z}/{y}/{x}',
     opacity: 0.72,
+    maxZoom: 15,
   },
   {
     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
     opacity: 0.85,
+    maxZoom: 13,
   },
 ];
 
 const TILE_SIZE = 256;
 const MAX_TILES_PER_LAYER = 72;
+
+// Total tile budget across every layer for the dynamic-zoom camera pyramid
+// (unique tiles only; keeps memory and network sane for a full render)
+const MAX_TOTAL_TILES = 2200;
+
+// Export camera choreography — mirrors MapViewport's Dynamic Zoom exactly
+// (close-up at starts/stops, pulled back during transit, smoothstep easing)
+const CLOSE_ZOOM_FLIGHT = 9.5;
+const OVERVIEW_ZOOM_FLIGHT = 5.5;
+const CLOSE_ZOOM_GROUND = 12.8;
+const OVERVIEW_ZOOM_GROUND = 8.2;
+const CAMERA_CENTER_RATE = 18; // exponential damping, 1/s — same as the live map
+const CAMERA_ZOOM_RATE = 12;
 
 // Web-Mercator helpers (same projection the Leaflet map uses, so tiles align
 // exactly with route geometry drawn on the export canvas)
@@ -78,6 +94,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   const [isRendering, setIsRendering] = useState(false);
   const [renderProgress, setRenderProgress] = useState(0);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
+  const [useDynamicZoom, setUseDynamicZoom] = useState(true);
   const [downloadFilename, setDownloadFilename] = useState<string>('');
   const dialogRef = useModalA11y(isOpen, onClose);
 
@@ -85,33 +102,37 @@ export const ExportModal: React.FC<ExportModalProps> = ({
 
   const currentDims = RESOLUTION_DIMS[aspectRatio][resolution];
 
-  // Initiate Video Render via Offscreen Canvas & MediaRecorder
+  // Export the journey to video. The camera mirrors the map's Dynamic Zoom
+  // choreography (damped follow-cam, close-ups at leg starts/stops, pulled
+  // back during transit). Tiles are drawn into the recording canvas on demand
+  // from a request cache at whichever zoom level the camera asks for, capped
+  // per layer by each source's deepest supported mosaic.
   const handleStartRender = async () => {
     setIsRendering(true);
     setRenderProgress(0);
     setDownloadUrl(null);
 
-    // Calculate total duration in seconds
     const totalLegsDuration = legs.reduce(
       (sum, leg) => sum + leg.durationSeconds + leg.pauseAtDestinationSeconds,
       0
     );
     const duration = Math.max(4, totalLegsDuration);
     const totalFrames = Math.round(duration * fps);
+    const W = currentDims.width;
+    const H = currentDims.height;
 
-    // Create offscreen render canvas
     const canvas = document.createElement('canvas');
-    canvas.width = currentDims.width;
-    canvas.height = currentDims.height;
+    canvas.width = W;
+    canvas.height = H;
     const ctx = canvas.getContext('2d');
     if (!ctx) {
       setIsRendering(false);
       return;
     }
 
-    // Determine bounding box of all legs to frame the scene
+    // Bounding box of the whole journey (drives the route-overview camera)
     const allCoords: [number, number][] = [[homeBase.lat, homeBase.lng]];
-    legs.forEach(l => {
+    legs.forEach((l) => {
       if (l.cachedPath) allCoords.push(...l.cachedPath);
     });
 
@@ -122,8 +143,6 @@ export const ExportModal: React.FC<ExportModalProps> = ({
       minLng = Math.min(minLng, lng);
       maxLng = Math.max(maxLng, lng);
     });
-
-    // Add 30% padding
     const latSpan = Math.max(0.05, (maxLat - minLat) * 1.3);
     const lngSpan = Math.max(0.05, (maxLng - minLng) * 1.3);
     const centerLat = (minLat + maxLat) / 2;
@@ -133,8 +152,10 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     const leftLng = centerLng - lngSpan / 2;
     const rightLng = centerLng + lngSpan / 2;
 
-    // Pick the highest tile zoom whose whole padded bbox fits the tile budget
-    let zoom = 3;
+    // Route-overview framing (MUST match the old static export exactly so the
+    // camera can start wide and glide in, and so toggle-off reproduces the
+    // original framing).
+    let fitZoom = 3;
     for (let z = 3; z <= 11; z++) {
       const ws = TILE_SIZE * Math.pow(2, z);
       const nx =
@@ -146,81 +167,260 @@ export const ExportModal: React.FC<ExportModalProps> = ({
         Math.floor(latToGlobalPx(topLat, ws) / TILE_SIZE) +
         1;
       if (nx * ny > MAX_TILES_PER_LAYER) break;
-      zoom = z;
+      fitZoom = z;
+    }
+    const wsFit = TILE_SIZE * Math.pow(2, fitZoom);
+    const gxLeftFit = lngToGlobalPx(leftLng, wsFit);
+    const gyTopFit = latToGlobalPx(topLat, wsFit);
+    const spanXFit = lngToGlobalPx(rightLng, wsFit) - gxLeftFit;
+    const spanYFit = latToGlobalPx(bottomLat, wsFit) - gyTopFit;
+    const fitScale = Math.min(W / spanXFit, H / spanYFit);
+    const routeCam = {
+      lat: centerLat,
+      lng: centerLng,
+      zoom: fitZoom + Math.log2(fitScale),
+    };
+
+    // ---- Camera choreography (target mirror of the live Dynamic Zoom) ----
+    // Global shift subtracted from every zoom target to satisfy the tile budget.
+    let zoomShift = 0;
+    let dynamicZoom = useDynamicZoom;
+
+    const cameraTargetAt = (timeSec: number): { lat: number; lng: number; zoom: number } => {
+      if (legs.length === 0) return { ...routeCam };
+      let accumulated = 0;
+      for (let i = 0; i < legs.length; i++) {
+        const legTotal = legs[i].durationSeconds + legs[i].pauseAtDestinationSeconds;
+        if (timeSec <= accumulated + legTotal || i === legs.length - 1) {
+          const leg = legs[i];
+          const inside = Math.max(0, timeSec - accumulated);
+          const legT = leg.durationSeconds > 0 ? Math.min(1, inside / leg.durationSeconds) : 1;
+
+          // Position: sub-frame interpolation along the same cachedPath the vehicle uses
+          let lat = leg.to.lat;
+          let lng = leg.to.lng;
+          if (leg.cachedPath && leg.cachedPath.length >= 2) {
+            const path = leg.cachedPath;
+            const f = legT * (path.length - 1);
+            const lo = Math.floor(f);
+            const hi = Math.min(path.length - 1, lo + 1);
+            const fr = f - lo;
+            lat = path[lo][0] + (path[hi][0] - path[lo][0]) * fr;
+            lng = path[lo][1] + (path[hi][1] - path[lo][1]) * fr;
+          }
+
+          // Zoom: close-up at departure, pull back mid-transit, glide in at arrival
+          const isFlight = leg.mode === 'flight';
+          const over = (isFlight ? OVERVIEW_ZOOM_FLIGHT : OVERVIEW_ZOOM_GROUND) - zoomShift;
+          const close = (isFlight ? CLOSE_ZOOM_FLIGHT : CLOSE_ZOOM_GROUND) - zoomShift;
+          let zoom = close;
+          if (legT < 0.22) {
+            const t = legT / 0.22;
+            const ease = t * t * (3 - 2 * t);
+            zoom = close - ease * (close - over);
+          } else if (legT > 0.78) {
+            const t = (legT - 0.78) / 0.22;
+            const ease = t * t * (3 - 2 * t);
+            zoom = over + ease * (close - over);
+          } else {
+            zoom = over;
+          }
+          // Pull-back safety floor: never frame wider than the route overview.
+          // The pre-spawned base tile levels cover exactly this framing, so the
+          // camera can never reveal un-tiled area (beige fallback or a mosaic
+          // edge) when it pulls back mid-transit.
+          zoom = Math.max(zoom, routeCam.zoom);
+          return { lat, lng, zoom };
+        }
+        accumulated += legTotal;
+      }
+      return { ...routeCam };
+    };
+
+    // Visible integer-tile window at the camera's fractional zoom, projected
+    // into a given layer's zoom level (integer).
+    const visibleTileRange = (
+      cam: { lat: number; lng: number; zoom: number },
+      zLayer: number
+    ) => {
+      const n = 1 << zLayer;
+      const camWorld = TILE_SIZE * Math.pow(2, cam.zoom);
+      const camX = lngToGlobalPx(cam.lng, camWorld);
+      const camY = latToGlobalPx(cam.lat, camWorld);
+      // World px covered by one tile of this layer's zoom when scaled up or
+      // down by (cam.zoom - zLayer) levels.
+      const tileWorld = TILE_SIZE * Math.pow(2, cam.zoom - zLayer);
+      const x0 = Math.max(0, Math.floor((camX - W / 2) / tileWorld));
+      const x1 = Math.min(n - 1, Math.floor((camX + W / 2) / tileWorld));
+      const y0 = Math.max(0, Math.floor((camY - H / 2) / tileWorld));
+      const y1 = Math.min(n - 1, Math.floor((camY + H / 2) / tileWorld));
+      return { n, x0, x1, y0, y1, tileWorld, camX, camY };
+    };
+
+    // Estimate unique tile downloads across every layer for a candidate
+    // zoom shift. Synchronous — sets zoomShift so cameraTargetAt picks it up.
+    const estimateCameraTiles = (shift: number): number => {
+      zoomShift = shift;
+      const unions = EXPORT_TILE_LAYERS.map(() => new Set<string>());
+      const step = Math.max(1, Math.floor(totalFrames / 90));
+      for (let f = 0; f <= totalFrames; f += step) {
+        const cam = cameraTargetAt((f / totalFrames) * duration);
+        EXPORT_TILE_LAYERS.forEach((layer, li) => {
+          const zL = Math.max(1, Math.min(layer.maxZoom, Math.round(cam.zoom)));
+          const r = visibleTileRange(cam, zL);
+          for (let ty = r.y0; ty <= r.y1; ty++) {
+            for (let tx = r.x0; tx <= r.x1; tx++) {
+              unions[li].add(`${zL}/${tx}/${ty}`);
+            }
+          }
+        });
+      }
+      return unions.reduce((sum, s) => sum + s.size, 0);
+    };
+
+    // Fit the corridor within the total tile budget by pulling the camera back
+    // in 0.5-zoom steps (dynamics preserved, field of view widened, fewer tiles).
+    if (dynamicZoom) {
+      while (estimateCameraTiles(zoomShift) > MAX_TOTAL_TILES) {
+        if (zoomShift >= 5.5) {
+          dynamicZoom = false;
+          zoomShift = 0;
+          break;
+        }
+        zoomShift += 0.5;
+      }
+      zoomShift = dynamicZoom ? zoomShift : 0;
     }
 
-    // Uniform Web-Mercator framing so route geometry lands exactly on the tiles
-    const worldSize = TILE_SIZE * Math.pow(2, zoom);
-    const gxLeft = lngToGlobalPx(leftLng, worldSize);
-    const gyTop = latToGlobalPx(topLat, worldSize);
-    const worldPxSpanX = lngToGlobalPx(rightLng, worldSize) - gxLeft;
-    const worldPxSpanY = latToGlobalPx(bottomLat, worldSize) - gyTop;
-    const mapScale = Math.min(currentDims.width / worldPxSpanX, currentDims.height / worldPxSpanY);
-    const mapOffsetX = (currentDims.width - worldPxSpanX * mapScale) / 2;
-    const mapOffsetY = (currentDims.height - worldPxSpanY * mapScale) / 2;
-
-    const latToY = (lat: number) =>
-      mapOffsetY + (latToGlobalPx(lat, worldSize) - gyTop) * mapScale;
-    const lngToX = (lng: number) =>
-      mapOffsetX + (lngToGlobalPx(lng, worldSize) - gxLeft) * mapScale;
-
-    // --- Preload & composite the real basemap into an offscreen background canvas ---
-    const bgCanvas = document.createElement('canvas');
-    bgCanvas.width = currentDims.width;
-    bgCanvas.height = currentDims.height;
-    const bctx = bgCanvas.getContext('2d');
-    if (bctx) {
-      bctx.fillStyle = '#EBE5DA'; // fallback if tiles fail to load
-      bctx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
-
-      const tx0 = Math.max(0, Math.floor(gxLeft / TILE_SIZE));
-      const ty0 = Math.max(0, Math.floor(gyTop / TILE_SIZE));
-      const tx1 = Math.min(
-        Math.pow(2, zoom) - 1,
-        Math.floor((gxLeft + worldPxSpanX) / TILE_SIZE)
-      );
-      const ty1 = Math.min(
-        Math.pow(2, zoom) - 1,
-        Math.floor((gyTop + worldPxSpanY) / TILE_SIZE)
-      );
-
-      const loadTile = async (
-        layerUrl: string,
-        tx: number,
-        ty: number
-      ): Promise<HTMLImageElement | null> =>
-        new Promise((resolve) => {
+    // ---- On-demand tile pyramid ----
+    const tileCache = new Map<string, Promise<HTMLImageElement | null>>();
+    const tileImages = new Map<string, HTMLImageElement | null>();
+    const loadTile = (layerUrl: string, z: number, x: number, y: number) => {
+      const key = `${layerUrl}|${z}|${x}|${y}`;
+      let p = tileCache.get(key);
+      if (!p) {
+        p = new Promise<HTMLImageElement | null>((resolve) => {
           const img = new Image();
           img.crossOrigin = 'anonymous';
           img.onload = () => resolve(img);
           img.onerror = () => resolve(null);
           img.src = layerUrl
-            .replace('{z}', String(zoom))
-            .replace('{y}', String(ty))
-            .replace('{x}', String(tx));
+            .replace('{z}', String(z))
+            .replace('{y}', String(y))
+            .replace('{x}', String(x));
         });
+        p.then((img) => {
+          tileImages.set(key, img);
+        });
+        tileCache.set(key, p);
+      }
+      return p;
+    };
 
-      for (const layer of EXPORT_TILE_LAYERS) {
-        const jobs: Promise<void>[] = [];
-        for (let ty = ty0; ty <= ty1; ty++) {
-          for (let tx = tx0; tx <= tx1; tx++) {
-            jobs.push(
-              (async () => {
-                const img = await loadTile(layer.url, tx, ty);
-                if (!img) return;
-                const px = mapOffsetX + (tx * TILE_SIZE - gxLeft) * mapScale;
-                const py = mapOffsetY + (ty * TILE_SIZE - gyTop) * mapScale;
-                const size = TILE_SIZE * mapScale + 1; // +1px avoids seam gaps
-                bctx.globalAlpha = layer.opacity;
-                bctx.drawImage(img, px, py, size, size);
-              })()
-            );
+    // Pre-spawn the whole camera-corridor's tiles, first-use ordered, so the
+    // render paces into mostly-warm caches. Concurrency-capped worker pool.
+    if (dynamicZoom) {
+      const jobs: { layerUrl: string; z: number; x: number; y: number }[] = [];
+      const seen = new Set<string>();
+      // Base coverage first: the entire route bbox at the overview zoom and one
+      // level deeper. These guarantee every camera position has imagery to draw
+      // while corridor tiles (added below) are still arriving.
+      const baseLevels = [fitZoom, fitZoom + 1].filter(
+        (z) => z >= 1 && z <= Math.min(11, Math.max(...EXPORT_TILE_LAYERS.map((l) => l.maxZoom)))
+      );
+      for (const bz of baseLevels) {
+        const bws = TILE_SIZE * Math.pow(2, bz);
+        const bcam = { lat: centerLat, lng: centerLng, zoom: bz };
+        const br = visibleTileRange(bcam, bz);
+        const count =
+          (br.x1 - br.x0 + 1) * (br.y1 - br.y0 + 1);
+        if (count > 400) continue; // too wide at this level — skip
+        for (let ty = br.y0; ty <= br.y1; ty++) {
+          for (let tx = br.x0; tx <= br.x1; tx++) {
+            const key = `${bz}/${tx}/${ty}`;
+            if (seen.has(key)) continue;
+            seen.add(key);
+            EXPORT_TILE_LAYERS.forEach((layer) => {
+              jobs.push({ layerUrl: layer.url, z: bz, x: tx, y: ty });
+            });
           }
         }
-        await Promise.all(jobs);
       }
-      bctx.globalAlpha = 1;
+      for (let f = 0; f <= totalFrames; f += 4) {
+        const cam = cameraTargetAt((f / totalFrames) * duration);
+        EXPORT_TILE_LAYERS.forEach((layer) => {
+          const zL = Math.max(1, Math.min(layer.maxZoom, Math.round(cam.zoom)));
+          const r = visibleTileRange(cam, zL);
+          for (let ty = r.y0; ty <= r.y1; ty++) {
+            for (let tx = r.x0; tx <= r.x1; tx++) {
+              const key = `${zL}/${tx}/${ty}`;
+              if (seen.has(key)) continue;
+              seen.add(key);
+              jobs.push({ layerUrl: layer.url, z: zL, x: tx, y: ty });
+            }
+          }
+        });
+      }
+      let jobIdx = 0;
+      const workerCount = 12;
+      const worker = async () => {
+        while (jobIdx < jobs.length) {
+          const j = jobs[jobIdx++];
+          await loadTile(j.layerUrl, j.z, j.x, j.y);
+        }
+      };
+      const prefetchDone = Promise.all(
+        Array.from({ length: workerCount }, () => worker())
+      );
+      // Give the opening frame a moment of imagery before the recorder starts
+      await Promise.race([
+        prefetchDone,
+        new Promise((r) => setTimeout(r, 500)),
+      ]);
     }
+
+    // Composite one frame's basemap into the recording canvas: fill fallback,
+    // then draw whatever tile pyramid entries are already loaded for a
+    // per-layer integer zoom, clamped to each layer's deepest native mosaic.
+    const drawBasemap = (cam: { lat: number; lng: number; zoom: number }) => {
+      ctx.fillStyle = '#EBE5DA';
+      ctx.fillRect(0, 0, W, H);
+      EXPORT_TILE_LAYERS.forEach((layer) => {
+        const zL = Math.max(1, Math.min(layer.maxZoom, Math.round(cam.zoom)));
+        // Coarse-to-fine passes: the preloaded base levels always cover the
+        // visible area, so missing corridor tiles appear as slightly blurrier
+        // imagery for a moment instead of a blank fallback color.
+        const passZooms = new Set<number>([zL, fitZoom]);
+        if (zL > 1) passZooms.add(zL - 1);
+        if (fitZoom + 1 < zL) passZooms.add(fitZoom + 1);
+        const passes = [...passZooms]
+          .filter((z) => z >= 1 && z <= layer.maxZoom)
+          .sort((a, b) => a - b);
+        for (const zp of passes) {
+          const r = zp === zL ? visibleTileRange(cam, zp) : visibleTileRange(cam, zp);
+          for (let ty = r.y0; ty <= r.y1; ty++) {
+            for (let tx = r.x0; tx <= r.x1; tx++) {
+              const key = `${layer.url}|${zp}|${tx}|${ty}`;
+              if (!tileImages.has(key)) {
+                if (!tileCache.has(key) && zp === zL) loadTile(layer.url, zp, tx, ty);
+                continue;
+              }
+              const img = tileImages.get(key);
+              if (!img) continue;
+              const px = tx * r.tileWorld - (r.camX - W / 2);
+              const py = ty * r.tileWorld - (r.camY - H / 2);
+              const size = r.tileWorld + 1; // +1px hides seams
+              ctx.globalAlpha = layer.opacity;
+              ctx.drawImage(img, px, py, size, size);
+            }
+          }
+        }
+      });
+      ctx.globalAlpha = 1;
+    };
+
+    // Camera state (damped follow position + fractional zoom for the frame loop)
+    let camCurrent: { lat: number; lng: number; zoom: number } = { ...routeCam };
 
     const stream = canvas.captureStream(fps);
     const mimeType = MediaRecorder.isTypeSupported('video/mp4')
@@ -258,9 +458,48 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     for (let frame = 0; frame <= totalFrames; frame++) {
       const progress = frame / totalFrames;
       const currentTimeSec = progress * duration;
+      const dt = 1 / fps;
 
-      // Real composited basemap (static across frames — drawn once before capture)
-      ctx.drawImage(bgCanvas, 0, 0);
+      // Camera state: dynamic zoom glides toward the live-app target with the
+      // same exponential damping; static keeps the fixed route-overview view.
+      if (dynamicZoom) {
+        const target = cameraTargetAt(currentTimeSec);
+        const aC = 1 - Math.exp(-CAMERA_CENTER_RATE * dt);
+        const aZ = 1 - Math.exp(-CAMERA_ZOOM_RATE * dt);
+        camCurrent = {
+          lat: camCurrent.lat + (target.lat - camCurrent.lat) * aC,
+          lng: camCurrent.lng + (target.lng - camCurrent.lng) * aC,
+          zoom: camCurrent.zoom + (target.zoom - camCurrent.zoom) * aZ,
+        };
+      } else {
+        camCurrent = { ...routeCam };
+      }
+
+      // Make sure this frame's native-level tiles have arrived before
+      // painting; a late arrival would otherwise be drawn from a coarse pass
+      // as huge upscaled pixels (blurry labels, visible seams).
+      const frameTileJobs: Promise<HTMLImageElement | null>[] = [];
+      EXPORT_TILE_LAYERS.forEach((layer) => {
+        const zL = Math.max(1, Math.min(layer.maxZoom, Math.round(camCurrent.zoom)));
+        const r = visibleTileRange(camCurrent, zL);
+        for (let ty = r.y0; ty <= r.y1; ty++) {
+          for (let tx = r.x0; tx <= r.x1; tx++) {
+            frameTileJobs.push(loadTile(layer.url, zL, tx, ty));
+          }
+        }
+      });
+      await Promise.all(frameTileJobs);
+
+      drawBasemap(camCurrent);
+
+      // Overlay geometry projected through the same camera transform
+      const camWorldSize = TILE_SIZE * Math.pow(2, camCurrent.zoom);
+      const camWorldX = lngToGlobalPx(camCurrent.lng, camWorldSize);
+      const camWorldY = latToGlobalPx(camCurrent.lat, camWorldSize);
+      const lngToScreenX = (lng: number) =>
+        W / 2 + (lngToGlobalPx(lng, camWorldSize) - camWorldX);
+      const latToScreenY = (lat: number) =>
+        H / 2 + (latToGlobalPx(lat, camWorldSize) - camWorldY);
 
       // Find active leg based on elapsed time
       let accumulatedTime = 0;
@@ -285,9 +524,9 @@ export const ExportModal: React.FC<ExportModalProps> = ({
       // Draw all route paths
       legs.forEach((leg, i) => {
         if (!leg.cachedPath || leg.cachedPath.length < 2) return;
-        const pts = leg.cachedPath.map(coord => ({
-          x: lngToX(coord[1]),
-          y: latToY(coord[0]),
+        const pts = leg.cachedPath.map((coord) => ({
+          x: lngToScreenX(coord[1]),
+          y: latToScreenY(coord[0]),
         }));
 
         ctx.save();
@@ -308,7 +547,8 @@ export const ExportModal: React.FC<ExportModalProps> = ({
         }
 
         ctx.beginPath();
-        const ptCount = i === activeIdx ? Math.floor(pts.length * legT) : i < activeIdx ? pts.length : pts.length;
+        const ptCount =
+          i === activeIdx ? Math.floor(pts.length * legT) : i < activeIdx ? pts.length : pts.length;
         pts.slice(0, Math.max(1, ptCount)).forEach((pt, pIdx) => {
           if (pIdx === 0) ctx.moveTo(pt.x, pt.y);
           else ctx.lineTo(pt.x, pt.y);
@@ -330,8 +570,8 @@ export const ExportModal: React.FC<ExportModalProps> = ({
         const p2 = path[idxHigh];
         const curLat = p1[0] + (p2[0] - p1[0]) * frac;
         const curLng = p1[1] + (p2[1] - p1[1]) * frac;
-        const vx = lngToX(curLng);
-        const vy = latToY(curLat);
+        const vx = lngToScreenX(curLng);
+        const vy = latToScreenY(curLat);
         const bearing = calculateBearing(p1[0], p1[1], p2[0], p2[1]);
         const angleRad = toRad(bearing - 90);
 
@@ -347,7 +587,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
           angleRad,
           mode: activeLeg.mode,
           color: activeLeg.vehicleColor,
-          scale: (activeLeg.vehicleScale || 1) * (currentDims.width / 1200),
+          scale: (activeLeg.vehicleScale || 1) * (W / 1200),
           altitudeRatio: altRatio,
           timeMs: currentTimeSec * 1000,
           showTrail: activeLeg.showTrail,
@@ -357,17 +597,15 @@ export const ExportModal: React.FC<ExportModalProps> = ({
 
       // Title & Expedition Watermark
       ctx.fillStyle = '#0E6466';
-      ctx.font = `bold ${Math.round(currentDims.width * 0.024)}px "Plus Jakarta Sans", sans-serif`;
-      ctx.fillText(`EXPEDITION JOURNEY · ${homeBase.name}`, 60, currentDims.height - 70);
+      ctx.font = `bold ${Math.round(W * 0.024)}px "Plus Jakarta Sans", sans-serif`;
+      ctx.fillText(`EXPEDITION JOURNEY · ${homeBase.name}`, 60, H - 70);
 
       ctx.fillStyle = '#78716C';
-      ctx.font = `500 ${Math.round(currentDims.width * 0.014)}px "JetBrains Mono", monospace`;
-      ctx.fillText(`ANIMATED WITH MAPANIMATOR · ${currentDims.width}x${currentDims.height} @ ${fps}FPS`, 60, currentDims.height - 40);
+      ctx.font = `500 ${Math.round(W * 0.014)}px "JetBrains Mono", monospace`;
+      ctx.fillText(`ANIMATED WITH MAPANIMATOR · ${W}x${H} @ ${fps}FPS`, 60, H - 40);
 
-      // Pace frames in real time: MediaRecorder records wall-clock time, so
-      // drawing all frames as fast as possible compresses the whole journey
-      // into a few seconds. Waiting for the frame's real timestamp keeps the
-      // exported video's duration equal to the journey's actual duration.
+      // Real-time pacing: MediaRecorder records wall-clock time, so the
+      // renderer waits for each frame's true timestamp instead of racing.
       const targetMs = startedAt + (frame * 1000) / fps;
       const wait = targetMs - performance.now();
       if (wait > 0) {
@@ -510,6 +748,32 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* 4. Camera Motion */}
+          <div>
+            <label className="text-xs font-bold uppercase tracking-wider text-[#0E6466] block mb-2">
+              4. Camera Motion
+            </label>
+            <button
+              type="button"
+              onClick={() => setUseDynamicZoom((v) => !v)}
+              disabled={isRendering}
+              aria-pressed={useDynamicZoom}
+              className={`w-full flex items-center justify-between p-3 rounded-2xl border transition-all ${
+                useDynamicZoom
+                  ? 'border-[#0E6466] bg-[#0E6466]/5 text-[#0E6466] ring-1 ring-[#0E6466]'
+                  : 'border-stone-200 hover:border-stone-400 text-stone-700 bg-stone-50'
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                <span className="text-xs font-bold">Dynamic Zoom</span>
+                <span className="text-xs text-stone-400">Follow the vehicle with cinematic close-ups and pull-backs</span>
+              </span>
+              <span className={`text-xs font-bold ${useDynamicZoom ? 'text-[#0E6466]' : 'text-stone-400'}`}>
+                {useDynamicZoom ? 'ON' : 'OFF'}
+              </span>
+            </button>
           </div>
 
           {/* Render Progress or Download Button */}
