@@ -16,13 +16,14 @@ export interface TravelerIconDefinition {
 }
 
 /**
- * Shaded 3-Tone Top-Down Design System:
+ * Monochrome Shaded Top-Down Design System (Apple-style):
  * Canvas glyphs are LIVE-RENDERED from the exact same draw functions that
  * animate sprites on the map (see utils/vehicleDrawers.ts), so the icon
  * picker, sidebar and exported video all show pixel-identical vehicles:
- * - Crisp dark outline (#0F172A) anchoring the silhouette
+ * - Every sprite renders in shades of ONE hue — the user's chosen color
+ * - Hierarchy: deep-shade glazing, dark-shade outline, pure-color accents,
+ *   light-tint body panels; neutral dark ground shadow
  * - Object-space gradient shading: lit edge + shaded edge on every panel
- * - Dark glazing with specular streaks for glass canopies
  */
 
 /**

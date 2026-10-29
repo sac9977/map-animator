@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import L from 'leaflet';
 import { Sun, Compass } from 'lucide-react';
 import { JourneyLeg, MapTileStyle, Waypoint } from '../types/travel';
+import { CLOSE_ZOOM_FLIGHT, CLOSE_ZOOM_GROUND, transitZoomFor } from '../utils/cameraZoom';
 import { drawAnimatedVehicle } from '../utils/vehicleDrawers';
 import { calculateBearing, toRad } from '../utils/geoRouting';
 import { MapLayer } from './MapLayer';
@@ -35,6 +36,7 @@ interface MapViewportProps {
   onTrekPointAdded: (legIndex: number, point: [number, number]) => void;
   onFinishDrawingTrek: () => void;
   onOpenWeather?: () => void;
+  zoomPreview?: { lat: number; lng: number; zoomExport: number; shortSide: number; nonce: number } | null;
 }
 
 export const MapViewport: React.FC<MapViewportProps> = ({
@@ -51,6 +53,7 @@ export const MapViewport: React.FC<MapViewportProps> = ({
   onTrekPointAdded,
   onFinishDrawingTrek,
   onOpenWeather,
+  zoomPreview,
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -232,6 +235,24 @@ export const MapViewport: React.FC<MapViewportProps> = ({
     }
   }, [fitBoundsTrigger, fitRouteBounds]);
 
+  // Per-leg zoom preview: when the user trims a leg's transit zoom in the
+  // sidebar, snap the live map to that leg's transit framing — the same
+  // geographic span the video will show, rescaled to this viewport.
+  useEffect(() => {
+    if (!zoomPreview) return;
+    const map = mapRef.current;
+    if (!map) return;
+    const size = map.getSize();
+    const z = Math.max(
+      1,
+      Math.min(
+        19,
+        zoomPreview.zoomExport + Math.log2(Math.min(size.x, size.y) / zoomPreview.shortSide)
+      )
+    );
+    map.setView([zoomPreview.lat, zoomPreview.lng], z, { animate: false });
+  }, [zoomPreview?.nonce]);
+
   // Butter-Smooth Cinematic Camera Choreography & Auto-Zoom
   // Smoothly glides vehicle position and fractional zoom at 60fps without jarring step jumps
   useEffect(() => {
@@ -252,22 +273,28 @@ export const MapViewport: React.FC<MapViewportProps> = ({
     const currentLat = p1[0] + (p2[0] - p1[0]) * fraction;
     const currentLng = p1[1] + (p2[1] - p1[1]) * fraction;
 
-    // Smooth continuous target zoom with cubic smoothstep curve
+    // Smooth continuous target zoom with cubic smoothstep curve.
+    // Transit framing auto-fits the leg's geographic span (shared with the
+    // video export via cameraZoom), trimmed by the leg's zoom setting, so
+    // playback shows exactly the framing the rendered video will use.
+    const map = mapRef.current;
+    const size = map.getSize();
     const isFlight = currentLeg.mode === 'flight';
-    const closeZoom = isFlight ? 9.5 : 12.8;
-    const overviewZoom = isFlight ? 5.5 : 8.2;
+    const closeZoom = isFlight ? CLOSE_ZOOM_FLIGHT : CLOSE_ZOOM_GROUND;
+    const bias = currentLeg.zoomBias ?? 0;
+    const transitZoom = transitZoomFor(currentLeg, size.x, size.y, bias, 0, 256);
 
-    let targetZoom = overviewZoom;
+    let targetZoom = transitZoom;
     if (legProgress < 0.22) {
       // Departure: smoothly pull back with smoothstep easing
       const t = legProgress / 0.22;
       const ease = t * t * (3 - 2 * t);
-      targetZoom = closeZoom - ease * (closeZoom - overviewZoom);
+      targetZoom = closeZoom - ease * (closeZoom - transitZoom);
     } else if (legProgress > 0.78) {
       // Arrival: smoothly glide in with smoothstep easing
       const t = (legProgress - 0.78) / 0.22;
       const ease = t * t * (3 - 2 * t);
-      targetZoom = overviewZoom + ease * (closeZoom - overviewZoom);
+      targetZoom = transitZoom + ease * (closeZoom - transitZoom);
     }
 
     // Stage the target; the dedicated rAF camera loop applies it with
@@ -569,7 +596,7 @@ export const MapViewport: React.FC<MapViewportProps> = ({
   }, [scheduleRedraw, homeBase, legs, activeLegIndex, legProgress, currentTimeMs]);
 
   return (
-    <div className="relative flex-1 h-[calc(100vh-64px)] overflow-hidden bg-[#E2DBD0]">
+    <div className="relative flex-1 h-[calc(100vh-52px)] overflow-hidden bg-mapbg">
       {/* Leaflet Map DOM Node */}
       <div ref={mapContainerRef} className="absolute inset-0 z-0" />
 
@@ -591,33 +618,30 @@ export const MapViewport: React.FC<MapViewportProps> = ({
         className="absolute inset-0 pointer-events-none z-10"
       />
 
-      {/* Floating Safari Weather Card */}
+      {/* Floating Weather / Climate Card */}
       <button
         onClick={onOpenWeather}
         type="button"
-        title="Open Journey Weather & Climate Analysis"
-        className="absolute top-4 right-4 z-20 bg-white/95 hover:bg-white backdrop-blur-md border border-[#E6E1D7] hover:border-[#0E6466]/40 rounded-2xl p-3 shadow-lg flex items-center gap-3 transition-all hover:shadow-xl active:scale-95 text-left group cursor-pointer"
+        title="Open journey weather & climate analysis"
+        className="absolute top-4 right-4 z-20 bg-surface/90 hover:bg-surface backdrop-blur-xl border border-hairline2 hover:border-hairline rounded-lg p-2.5 shadow-md flex items-center gap-2.5 transition-all text-left group cursor-pointer"
       >
-        <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center text-[#F59E0B] group-hover:scale-105 transition-transform">
-          <Sun className="w-6 h-6 animate-[spin_12s_linear_infinite]" />
+        <div className="w-9 h-9 rounded-md bg-amber-500/15 flex items-center justify-center text-amber-500">
+          <Sun className="w-5 h-5" />
         </div>
         <div>
-          <div className="flex items-baseline gap-1.5">
-            <span className="text-xl font-bold text-stone-900 font-mono-numbers">27°</span>
-            <span className="text-xs font-semibold text-stone-500">Sunny</span>
-            <span className="text-xs text-[#0E6466] font-bold bg-[#0E6466]/10 px-1.5 py-0.5 rounded-md ml-1 opacity-80 group-hover:opacity-100">
-              Climate
-            </span>
+          <div className="flex items-baseline gap-1.5 leading-tight">
+            <span className="text-[17px] font-semibold text-ink font-mono-numbers">27°</span>
+            <span className="text-[11px] text-ink2">Sunny</span>
           </div>
-          <p className="text-xs text-stone-400 font-medium">Voyager Imagery · Click for Historical Data</p>
+          <p className="text-[10px] text-ink3">Climate along route</p>
         </div>
       </button>
 
       {/* Banner when user is drawing a wilderness trek or picking a location */}
       {(isDrawingTrekForLegIndex !== null || isPickingLocation !== null) && (
-        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-30 bg-[#0E6466] text-white px-5 py-2.5 rounded-2xl shadow-2xl flex items-center gap-3">
-          <Compass className="w-4 h-4 text-[#F59E0B] animate-spin" />
-          <span className="text-xs font-semibold">
+        <div className="absolute bottom-5 left-1/2 -translate-x-1/2 z-30 bg-black/80 dark:bg-black/70 text-white backdrop-blur-xl px-4 py-2 rounded-full shadow-xl flex items-center gap-2.5">
+          <Compass className="w-3.5 h-3.5 animate-spin" />
+          <span className="text-xs font-medium">
             {isDrawingTrekForLegIndex !== null
               ? 'Click anywhere on terrain to place trek waypoints. Click Done when finished.'
               : 'Click on the map to set location coordinates.'}
@@ -625,9 +649,9 @@ export const MapViewport: React.FC<MapViewportProps> = ({
           {isDrawingTrekForLegIndex !== null && (
             <button
               onClick={onFinishDrawingTrek}
-              className="px-3 py-1 bg-[#F59E0B] hover:bg-[#D97706] text-stone-900 text-xs font-bold rounded-lg shadow-sm"
+              className="px-3 py-1 bg-accent hover:bg-accent-strong text-white text-xs font-semibold rounded-full"
             >
-              Done Drawing
+              Done
             </button>
           )}
         </div>

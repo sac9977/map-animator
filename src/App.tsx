@@ -9,12 +9,13 @@ import { Navbar } from './components/Navbar';
 import { Sidebar } from './components/Sidebar';
 import { MapViewport } from './components/MapViewport';
 import { TimelineController } from './components/TimelineController';
-import { ExportModal } from './components/ExportModal';
+import { ExportModal, RESOLUTION_DIMS } from './components/ExportModal';
 import { PresetsModal } from './components/PresetsModal';
 import { WeatherOverlay } from './components/WeatherOverlay';
 import { ElevationProfileViewer } from './components/ElevationProfileViewer';
-import { JourneyLeg, Waypoint } from './types/travel';
+import { JourneyLeg, AspectRatio, VideoResolution, Waypoint } from './types/travel';
 import { PRESET_JOURNEYS, JourneyPreset } from './data/presetJourneys';
+import { transitZoomFor } from './utils/cameraZoom';
 import { calculateCatmullRomSpline, fetchRoadRoute } from './utils/geoRouting';
 import { useModalA11y } from './hooks/useModalA11y';
 
@@ -35,41 +36,41 @@ const ClearJourneyConfirmModal: React.FC<{
         role="dialog"
         aria-modal="true"
         aria-labelledby="clear-confirm-modal-title"
-        className="bg-[#FFFFFF] border border-[#E6E1D7] w-full max-w-md rounded-3xl shadow-2xl overflow-hidden p-6 space-y-5 animate-in zoom-in-95 duration-150 outline-none"
+        className="bg-surface border border-hairline w-full max-w-md rounded-lg shadow-2xl overflow-hidden p-6 space-y-5 animate-in zoom-in-95 duration-150 outline-none"
       >
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-lg bg-red-50 text-red-600 flex items-center justify-center">
               <AlertTriangle className="w-5 h-5" />
             </div>
             <div>
-              <h3 id="clear-confirm-modal-title" className="text-base font-bold text-stone-900">Clear Entire Journey?</h3>
-              <p className="text-xs text-stone-500">Reset itinerary to a clean blank canvas</p>
+              <h3 id="clear-confirm-modal-title" className="text-base font-bold text-ink">Clear Entire Journey?</h3>
+              <p className="text-xs text-ink2">Reset itinerary to a clean blank canvas</p>
             </div>
           </div>
           <button
             onClick={onClose}
             aria-label="Close without clearing"
-            className="p-1.5 text-stone-400 hover:text-stone-700 rounded-xl hover:bg-stone-100 transition-colors"
+            className="p-1.5 text-ink3 hover:text-ink rounded-lg hover:bg-well transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <p className="text-sm text-stone-600 leading-relaxed">
-          This will remove all <strong className="text-stone-900">{legsCount} journey {legsCount === 1 ? 'leg' : 'legs'}</strong> and reset the route so you can start plotting your own expedition from scratch.
+        <p className="text-sm text-ink2 leading-relaxed">
+          This will remove all <strong className="text-ink">{legsCount} journey {legsCount === 1 ? 'leg' : 'legs'}</strong> and reset the route so you can start plotting your own expedition from scratch.
         </p>
 
         <div className="flex items-center justify-end gap-3 pt-2">
           <button
             onClick={onClose}
-            className="px-4 py-2.5 rounded-xl border border-stone-200 text-xs font-semibold text-stone-700 hover:bg-stone-50 transition-colors"
+            className="px-4 py-2.5 rounded-lg border border-hairline text-xs font-semibold text-ink hover:bg-well transition-colors"
           >
             Cancel
           </button>
           <button
             onClick={onConfirm}
-            className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-semibold shadow-sm transition-all active:scale-95"
+            className="flex items-center gap-1.5 px-4 py-2.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-semibold shadow-sm transition-all active:scale-95"
           >
             <Trash2 className="w-3.5 h-3.5" />
             <span>Yes, Clear Journey</span>
@@ -92,6 +93,14 @@ export default function App() {
   const [legProgress, setLegProgress] = useState<number>(0); // 0 to 1
   const [playbackSpeed, setPlaybackSpeed] = useState<number>(1);
   const [autoZoom, setAutoZoom] = useState<boolean>(true);
+  // Export studio settings lifted here so the sidebar can preview the exact
+  // zoom the video will render, and Auto legs can inherit the export default.
+  const [aspectRatio, setAspectRatio] = useState<AspectRatio>('16:9');
+  const [resolution, setResolution] = useState<VideoResolution>('1080p');
+  const [zoomOutBias, setZoomOutBias] = useState(0);
+  const [zoomPreview, setZoomPreview] = useState<{
+    lat: number; lng: number; zoomExport: number; shortSide: number; nonce: number;
+  } | null>(null);
   const [currentTimeMs, setCurrentTimeMs] = useState<number>(0);
   const [fitBoundsTrigger, setFitBoundsTrigger] = useState<number>(1);
 
@@ -242,6 +251,27 @@ export default function App() {
     setLegs(prev => [...prev, newLeg]);
   };
 
+  // Live preview of a leg's transit framing: fly the map to the leg's path
+  // midpoint at the exact zoom the video will use (rescaled to this viewport).
+  const previewNonceRef = useRef(0);
+  const handlePreviewLeg = (index: number) => {
+    const leg = legs[index];
+    if (!leg) return;
+    const path = leg.cachedPath;
+    const mid =
+      path && path.length >= 2
+        ? path[Math.round((path.length - 1) / 2)]
+        : [leg.from.lat, leg.from.lng];
+    const dims = RESOLUTION_DIMS[aspectRatio][resolution];
+    setZoomPreview({
+      lat: mid[0],
+      lng: mid[1],
+      zoomExport: transitZoomFor(leg, dims.width, dims.height, leg.zoomBias || zoomOutBias, 0, 256),
+      shortSide: Math.min(dims.width, dims.height),
+      nonce: ++previewNonceRef.current,
+    });
+  };
+
   const handleRemoveLeg = (index: number) => {
     setLegs(prev => {
       const filtered = prev.filter((_, i) => i !== index);
@@ -361,7 +391,7 @@ export default function App() {
   const destinationPoint = legs.length > 0 ? legs[legs.length - 1].to : homeBase;
 
   return (
-    <div className="flex flex-col h-screen w-screen bg-[#F4F1EA] text-stone-800 font-sans select-none overflow-hidden">
+    <div className="flex flex-col h-screen w-screen bg-app text-ink font-sans select-none overflow-hidden">
       {/* Top Bar Contract Navbar */}
       <Navbar
         onOpenExport={() => setIsExportOpen(true)}
@@ -394,6 +424,9 @@ export default function App() {
           isDrawingTrekForLegIndex={isDrawingTrekForLegIndex}
           onStartPickingLocation={(target) => setIsPickingLocation(target)}
           isPickingLocation={isPickingLocation}
+          exportDims={RESOLUTION_DIMS[aspectRatio][resolution]}
+          zoomOutBias={zoomOutBias}
+          onPreviewLeg={handlePreviewLeg}
         />
 
         {/* Central Map & Elevation Area */}
@@ -413,6 +446,7 @@ export default function App() {
               onTrekPointAdded={handleTrekPointAdded}
               onFinishDrawingTrek={handleFinishDrawingTrek}
               onOpenWeather={() => setIsWeatherOpen(true)}
+              zoomPreview={zoomPreview}
             />
           </div>
 
@@ -457,6 +491,12 @@ export default function App() {
         onClose={() => setIsExportOpen(false)}
         homeBase={homeBase}
         legs={legs}
+        aspectRatio={aspectRatio}
+        setAspectRatio={setAspectRatio}
+        resolution={resolution}
+        setResolution={setResolution}
+        zoomOutBias={zoomOutBias}
+        setZoomOutBias={setZoomOutBias}
       />
 
       {/* Presets Modal */}

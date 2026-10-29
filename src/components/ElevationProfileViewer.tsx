@@ -369,25 +369,25 @@ export const ElevationProfileViewer: React.FC<ElevationProfileViewerProps> = ({
   // If collapsed to bottom strip
   if (heightState === 'collapsed') {
     return (
-      <div className="w-full bg-[#FFFFFF]/95 backdrop-blur-md border-t border-[#E6E1D7] px-4 py-1.5 flex items-center justify-between z-20 shrink-0 shadow-sm transition-all duration-200">
+      <div className="w-full bg-surface/95 backdrop-blur-md border-t border-hairline px-4 py-1.5 flex items-center justify-between z-20 shrink-0 shadow-sm transition-all duration-200">
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1.5 text-xs font-bold text-stone-800">
-            <Mountain className="w-3.5 h-3.5 text-[#0E6466]" />
-            <span className="tracking-wide">ELEVATION PROFILE</span>
+          <div className="flex items-center gap-1.5 text-xs font-bold text-ink">
+            <Mountain className="w-3.5 h-3.5 text-accent" />
+            <span className="tracking-wide">Elevation</span>
           </div>
 
-          <div className="h-3 w-px bg-stone-300" />
+          <div className="h-3 w-px bg-hairline" />
 
           {activeLeg && (
-            <span className="text-xs text-stone-600 font-medium truncate max-w-xs">
+            <span className="text-xs text-ink2 font-medium truncate max-w-xs">
               Leg {activeLegIndex + 1}: {activeLeg.label}
             </span>
           )}
 
           <div className="flex items-center gap-2 text-xs font-mono-numbers">
-            <span className="text-[#0E6466] font-bold">{formatElevation(liveStats.elevationMeters)}</span>
+            <span className="text-accent font-bold">{formatElevation(liveStats.elevationMeters)}</span>
             {currentAnalysis && (
-              <span className="text-stone-400 text-[11px]">
+              <span className="text-ink3 text-[11px]">
                 (Peak: {formatElevation(currentAnalysis.maxElevationMeters)})
               </span>
             )}
@@ -397,7 +397,7 @@ export const ElevationProfileViewer: React.FC<ElevationProfileViewerProps> = ({
         <div className="flex items-center gap-2">            <button
               onClick={() => setHeightState('compact')}
               aria-label="Open elevation profile"
-              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-semibold transition-colors"
+              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-well hover:bg-well text-ink text-xs font-semibold transition-colors"
               title="Expand Elevation Viewer"
             >
             <ChevronUp className="w-3.5 h-3.5" />
@@ -413,7 +413,7 @@ export const ElevationProfileViewer: React.FC<ElevationProfileViewerProps> = ({
   return (
     <div
       ref={containerRef}
-      className={`w-full bg-[#FFFFFF] border-t border-[#E6E1D7] flex flex-col z-10 shrink-0 shadow-[0_-4px_16px_-4px_rgba(30,41,59,0.05)] transition-all duration-200 ${containerHeightClass}`}
+      className={`w-full bg-surface border-t border-hairline flex flex-col z-10 shrink-0 shadow-[0_-4px_16px_-4px_rgba(30,41,59,0.05)] transition-all duration-200 ${containerHeightClass}`}
     >
       {/* Hidden File Input for GPX upload */}
       <input
@@ -424,143 +424,89 @@ export const ElevationProfileViewer: React.FC<ElevationProfileViewerProps> = ({
         className="hidden"
       />
 
-      {/* Elevation Profile Header Toolbar */}
-      <div className="h-10 px-4 border-b border-[#F0EBE1] bg-[#FAF8F5] flex items-center justify-between gap-3 shrink-0">
-        {/* Left: Title & Source Badge */}
-        <div className="flex items-center gap-2.5 min-w-0">
-          <div className="flex items-center gap-1.5 text-xs font-bold text-stone-900 tracking-wide uppercase">
-            <Mountain className="w-4 h-4 text-[#0E6466]" />
-            <span>Elevation Profile</span>
-          </div>
+      {/* Elevation Profile Header Toolbar (single row, no wrap) */}
+      <div className="h-10 px-3 border-b border-hairline bg-well flex items-center gap-2 shrink-0 flex-nowrap whitespace-nowrap">
+        {/* Left: Title & Leg / Route selector */}
+        <Mountain className="w-4 h-4 text-accent shrink-0" />
+        <span className="text-[13px] font-semibold text-ink shrink-0">Elevation</span>
 
-          {/* Leg Indicator / Selector */}
-          <div className="flex items-center bg-stone-200/60 p-0.5 rounded-lg text-[11px] font-medium text-stone-600">
-            <button
-              onClick={() => setViewMode('active_leg')}
-              aria-pressed={viewMode === 'active_leg'}
-              className={`px-2 py-0.5 rounded-md transition-colors ${
-                viewMode === 'active_leg'
-                  ? 'bg-white text-stone-900 font-bold shadow-xs'
-                  : 'hover:text-stone-900 text-stone-500'
-              }`}
-            >
-              Leg {activeLegIndex + 1}
-            </button>
-            <button
-              onClick={() => setViewMode('entire_journey')}
-              aria-pressed={viewMode === 'entire_journey'}
-              className={`px-2 py-0.5 rounded-md transition-colors ${
-                viewMode === 'entire_journey'
-                  ? 'bg-white text-stone-900 font-bold shadow-xs'
-                  : 'hover:text-stone-900 text-stone-500'
-              }`}
-            >
-              Entire Route
-            </button>
-          </div>
-
-          {/* Source tag */}
-          {currentAnalysis && (
-            <span
-              className={`text-xs font-semibold px-2 py-0.5 rounded-md ${
-                currentAnalysis.source === 'gpx'
-                  ? 'bg-amber-100 text-amber-800 border border-amber-200'
-                  : currentAnalysis.source === 'dem_api'
-                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                  : 'bg-stone-200 text-stone-600'
-              }`}
-            >
-              {currentAnalysis.source === 'gpx'
-                ? 'GPX Terrain Track'
-                : currentAnalysis.source === 'dem_api'
-                ? 'Copernicus 90m DEM'
-                : 'Topographical Profile'}
-            </span>
-          )}
+        <div className="flex items-center bg-hairline2/60 p-px rounded-md shrink-0">
+          <button
+            onClick={() => setViewMode('active_leg')}
+            aria-pressed={viewMode === 'active_leg'}
+            className={`px-2 py-0.5 rounded-[5px] text-[11px] font-medium transition-colors ${
+              viewMode === 'active_leg' ? 'bg-surface text-ink shadow-[0_1px_2px_rgba(0,0,0,0.1)]' : 'text-ink2 hover:text-ink'
+            }`}
+          >
+            Leg {activeLegIndex + 1}
+          </button>
+          <button
+            onClick={() => setViewMode('entire_journey')}
+            aria-pressed={viewMode === 'entire_journey'}
+            className={`px-2 py-0.5 rounded-[5px] text-[11px] font-medium transition-colors ${
+              viewMode === 'entire_journey' ? 'bg-surface text-ink shadow-[0_1px_2px_rgba(0,0,0,0.1)]' : 'text-ink2 hover:text-ink'
+            }`}
+          >
+            Route
+          </button>
         </div>
 
-        {/* Center: Live Telemetry Badges */}
-        <div className="flex items-center gap-3 text-xs font-mono-numbers overflow-x-auto no-scrollbar py-0.5">
-          {/* Current Altitude (Live synced!) */}
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#0E6466]/10 text-[#0E6466] border border-[#0E6466]/20">
-            <span className="w-2 h-2 rounded-full bg-[#0E6466] animate-pulse" />
-            <span className="text-xs uppercase font-sans font-bold text-[#0E6466]">Live Alt:</span>
-            <span className="font-bold text-xs">{formatElevation(liveStats.elevationMeters)}</span>
-          </div>
-
+        {/* Center: live telemetry (collapses gracefully) */}
+        <div className="flex-1 min-w-0 flex items-center gap-3 overflow-hidden text-[11px] font-mono-numbers justify-end pl-1">
+          <span className="flex items-center gap-1.5 text-accent shrink-0" title="Live altitude at the traveler position">
+            <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse shrink-0" />
+            {formatElevation(liveStats.elevationMeters)}
+          </span>
           {currentAnalysis && (
             <>
-              {/* Total Ascent */}
-              <div
-                className="flex items-center gap-1 text-emerald-700 font-semibold"
-                title="Cumulative Elevation Gain"
-              >
-                <ArrowUpRight className="w-3.5 h-3.5" />
-                <span className="text-xs uppercase font-sans text-stone-400">Gain:</span>
-                <span>+{formatElevation(currentAnalysis.elevationGainMeters)}</span>
-              </div>
-
-              {/* Total Descent */}
-              <div
-                className="flex items-center gap-1 text-sky-700 font-semibold"
-                title="Cumulative Elevation Loss"
-              >
-                <ArrowDownRight className="w-3.5 h-3.5" />
-                <span className="text-xs uppercase font-sans text-stone-400">Loss:</span>
-                <span>-{formatElevation(currentAnalysis.elevationLossMeters)}</span>
-              </div>
-
-              {/* Peak Summit */}
-              <div className="flex items-center gap-1 text-amber-800 font-semibold" title="Peak Max Elevation">
-                <Mountain className="w-3 h-3 text-amber-600" />
-                <span className="text-xs uppercase font-sans text-stone-400">Peak:</span>
-                <span>{formatElevation(currentAnalysis.maxElevationMeters)}</span>
-              </div>
-
-              {/* Live Grade / Slope */}
-              <div className="flex items-center gap-1 text-stone-600 font-semibold" title="Instantaneous Slope Grade">
-                <Gauge className="w-3 h-3 text-stone-400" />
-                <span className="text-xs uppercase font-sans text-stone-400">Grade:</span>
-                <span className={liveStats.gradePercent > 0 ? 'text-amber-700' : 'text-stone-700'}>
-                  {liveStats.gradePercent > 0 ? `+${liveStats.gradePercent}%` : `${liveStats.gradePercent}%`}
-                </span>
-              </div>
+              <span className="hidden lg:flex items-center gap-1 text-ink2" title="Cumulative elevation gain">
+                <ArrowUpRight className="w-3 h-3" />
+                <span className="text-emerald-600 font-semibold">+{formatElevation(currentAnalysis.elevationGainMeters)}</span>
+              </span>
+              <span className="hidden lg:flex items-center gap-1 text-ink2" title="Cumulative elevation loss">
+                <ArrowDownRight className="w-3 h-3" />
+                <span className="text-sky-500 font-semibold">-{formatElevation(currentAnalysis.elevationLossMeters)}</span>
+              </span>
+              <span className="hidden xl:flex items-center gap-1 text-ink2" title="Highest point of the leg">
+                <Mountain className="w-3 h-3" />
+                <span className="text-amber-600 font-semibold">{formatElevation(currentAnalysis.maxElevationMeters)}</span>
+              </span>
+              {currentAnalysis.source !== 'gpx' && (
+                <span className="hidden 2xl:inline text-ink3">{currentAnalysis.source === 'dem_api' ? 'Copernicus DEM' : 'Topographic'}</span>
+              )}
             </>
           )}
         </div>
 
-        {/* Right: GPX menu, Unit Switcher, View Toggles */}
-        <div className="flex items-center gap-1.5 shrink-0">
-          {/* GPX Options Dropdown */}
+        {/* Right: utilities */}
+        <div className="flex items-center gap-1 shrink-0">
           <div className="relative">
             <button
               onClick={() => setIsGPXDropdownOpen(!isGPXDropdownOpen)}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-semibold border border-stone-200/70 transition-colors"
-              title="Import GPX Terrain or Select Authentic Sample Track"
+              className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium transition-colors ${
+                isGPXDropdownOpen ? 'bg-hairline2/60 text-ink' : 'text-ink2 hover:text-ink hover:bg-hairline2/60'
+              }`}
+              title="Import GPX terrain or load a sample track"
             >
-              <FileCode className="w-3.5 h-3.5 text-amber-600" />
-              <span>GPX Options</span>
-              <ChevronDown className="w-3 h-3 text-stone-400" />
+              <FileCode className="w-3.5 h-3.5" />
+              <span>GPX</span>
+              <ChevronDown className="w-3 h-3 text-ink3" />
             </button>
 
             {isGPXDropdownOpen && (
-              <div className="absolute right-0 top-full mt-1.5 w-64 bg-white border border-[#E6E1D7] rounded-2xl shadow-xl p-2 z-50 text-xs animate-in fade-in zoom-in-95 duration-100">
-                <div className="px-2 py-1.5 text-xs font-bold uppercase tracking-wider text-stone-400 border-b border-stone-100 mb-1">
-                  Extract Terrain from GPX
-                </div>
-
-                {/* Upload own GPX */}
+              <div className="absolute right-0 top-full mt-1.5 w-64 bg-surface border border-hairline rounded-lg shadow-xl p-2 z-50 text-xs animate-in fade-in zoom-in-95 duration-100">
+{/* Upload own GPX */}
                 <button
                   onClick={() => {
                     fileInputRef.current?.click();
                     setIsGPXDropdownOpen(false);
                   }}
-                  className="w-full flex items-center gap-2 px-2.5 py-2 rounded-xl hover:bg-amber-50 text-stone-700 hover:text-amber-900 font-medium text-left transition-colors"
+                  className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-well text-ink font-medium text-left transition-colors"
                 >
                   <Upload className="w-4 h-4 text-amber-600" />
                   <div>
-                    <div className="font-semibold text-stone-800">Upload GPX File</div>
-                    <div className="text-xs text-stone-400">Extract tracks, heights & waypoints</div>
+                    <div className="font-semibold text-ink">Upload GPX File</div>
+                    <div className="text-xs text-ink3">Extract tracks, heights & waypoints</div>
                   </div>
                 </button>
 
@@ -571,16 +517,16 @@ export const ElevationProfileViewer: React.FC<ElevationProfileViewerProps> = ({
                     setIsGPXDropdownOpen(false);
                   }}
                   disabled={isFetchingDEM}
-                  className="w-full flex items-center gap-2 px-2.5 py-2 rounded-xl hover:bg-emerald-50 text-stone-700 hover:text-emerald-900 font-medium text-left transition-colors"
+                  className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-emerald-50 text-ink hover:text-emerald-900 font-medium text-left transition-colors"
                 >
                   <RefreshCw className={`w-4 h-4 text-emerald-600 ${isFetchingDEM ? 'animate-spin' : ''}`} />
                   <div>
-                    <div className="font-semibold text-stone-800">Fetch Real Satellite DEM</div>
-                    <div className="text-xs text-stone-400">Copernicus 90m terrain elevation</div>
+                    <div className="font-semibold text-ink">Fetch Real Satellite DEM</div>
+                    <div className="text-xs text-ink3">Copernicus 90m terrain elevation</div>
                   </div>
                 </button>
 
-                <div className="px-2 py-1.5 text-xs font-bold uppercase tracking-wider text-stone-400 border-t border-stone-100 mt-1 mb-0.5">
+                <div className="px-2 py-1.5 text-xs font-bold text-ink3 border-t border-hairline2 mt-1 mb-0.5">
                   Load Authentic GPX Track
                 </div>
 
@@ -588,12 +534,12 @@ export const ElevationProfileViewer: React.FC<ElevationProfileViewerProps> = ({
                   <button
                     key={sample.id}
                     onClick={() => handleLoadGPXText(sample.xml, `${sample.title}.gpx`)}
-                    className="w-full flex items-start gap-2 px-2.5 py-1.5 rounded-xl hover:bg-stone-50 text-stone-700 text-left transition-colors"
+                    className="w-full flex items-start gap-2 px-2.5 py-1.5 rounded-lg hover:bg-well text-ink text-left transition-colors"
                   >
-                    <Mountain className="w-3.5 h-3.5 text-stone-400 mt-0.5 shrink-0" />
+                    <Mountain className="w-3.5 h-3.5 text-ink3 mt-0.5 shrink-0" />
                     <div className="min-w-0">
-                      <div className="font-semibold text-stone-800 truncate">{sample.title}</div>
-                      <div className="text-xs text-stone-400 truncate">{sample.location}</div>
+                      <div className="font-semibold text-ink truncate">{sample.title}</div>
+                      <div className="text-xs text-ink3 truncate">{sample.location}</div>
                     </div>
                   </button>
                 ))}
@@ -604,28 +550,24 @@ export const ElevationProfileViewer: React.FC<ElevationProfileViewerProps> = ({
           {/* Metric / Imperial toggle */}
           <button
             onClick={() => setUseImperial(!useImperial)}
-            className="px-2 py-1 rounded-lg text-xs font-semibold bg-stone-100 hover:bg-stone-200 text-stone-700 transition-colors"
-            title="Toggle between Metric (m/km) and Imperial (ft/mi)"
+            className="px-2 py-1 rounded-md text-[11px] font-medium text-ink2 hover:text-ink hover:bg-hairline2/60 font-mono-numbers transition-colors"
+            title="Toggle metric (m/km) and imperial (ft/mi)"
           >
             {useImperial ? 'ft / mi' : 'm / km'}
           </button>
 
-          {/* Expand / Minimize toggle */}
           <button
             onClick={() => setHeightState(heightState === 'expanded' ? 'compact' : 'expanded')}
             aria-label={heightState === 'expanded' ? 'Compact elevation view' : 'Expand elevation view'}
-            className="p-1.5 rounded-lg text-stone-500 hover:text-stone-800 hover:bg-stone-100 transition-colors"
-            title={heightState === 'expanded' ? 'Compact View' : 'Expanded View'}
+            className="p-1.5 rounded-md text-ink2 hover:text-ink hover:bg-hairline2/60 transition-colors"
           >
             {heightState === 'expanded' ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
           </button>
 
-          {/* Collapse bar */}
           <button
             onClick={() => setHeightState('collapsed')}
             aria-label="Collapse elevation profile"
-            className="p-1.5 rounded-lg text-stone-500 hover:text-stone-800 hover:bg-stone-100 transition-colors"
-            title="Collapse Elevation Profile"
+            className="p-1.5 rounded-md text-ink2 hover:text-ink hover:bg-hairline2/60 transition-colors"
           >
             <ChevronDown className="w-3.5 h-3.5" />
           </button>
@@ -633,7 +575,7 @@ export const ElevationProfileViewer: React.FC<ElevationProfileViewerProps> = ({
       </div>
 
       {/* Main Chart Area */}
-      <div className="flex-1 w-full relative bg-[#FDFBF7] overflow-hidden select-none">
+      <div className="flex-1 w-full relative bg-surface overflow-hidden select-none">
         {svgData ? (
           <>
             <svg
@@ -648,21 +590,21 @@ export const ElevationProfileViewer: React.FC<ElevationProfileViewerProps> = ({
               <defs>
                 {/* Elevation Area Gradient */}
                 <linearGradient id="elevationAreaGradient" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#0E6466" stopOpacity="0.45" />
+                  <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.45" />
                   <stop offset="50%" stopColor="#D97706" stopOpacity="0.25" />
                   <stop offset="100%" stopColor="#D97706" stopOpacity="0.02" />
                 </linearGradient>
 
                 {/* Elevation Line Gradient */}
                 <linearGradient id="elevationLineGradient" x1="0" y1="0" x2="1" y2="0">
-                  <stop offset="0%" stopColor="#0E6466" />
-                  <stop offset="60%" stopColor="#0E6466" />
+                  <stop offset="0%" stopColor="var(--accent)" />
+                  <stop offset="60%" stopColor="var(--accent)" />
                   <stop offset="100%" stopColor="#D97706" />
                 </linearGradient>
 
                 {/* Glow Filter */}
                 <filter id="elevationGlow" x="-20%" y="-20%" width="140%" height="140%">
-                  <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor="#0E6466" floodOpacity="0.3" />
+                  <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor="var(--accent)" floodOpacity="0.3" />
                 </filter>
               </defs>
 
@@ -674,7 +616,7 @@ export const ElevationProfileViewer: React.FC<ElevationProfileViewerProps> = ({
                     y1={grid.y}
                     x2={svgData.width - svgData.padding.right}
                     y2={grid.y}
-                    stroke="#E5DFD3"
+                    stroke="var(--hairline-2)"
                     strokeWidth="1"
                     strokeDasharray={idx === 0 || idx === svgData.gridLines.length - 1 ? 'none' : '3 3'}
                   />
@@ -682,7 +624,7 @@ export const ElevationProfileViewer: React.FC<ElevationProfileViewerProps> = ({
                     x={svgData.padding.left - 6}
                     y={grid.y + 3.5}
                     textAnchor="end"
-                    fill="#78716C"
+                    fill="var(--ink-3)"
                     fontSize="9.5"
                     fontFamily="monospace"
                     fontWeight="500"
@@ -700,14 +642,14 @@ export const ElevationProfileViewer: React.FC<ElevationProfileViewerProps> = ({
                     y1={svgData.padding.top}
                     x2={tick.x}
                     y2={svgData.height - svgData.padding.bottom}
-                    stroke="#EFE9DC"
+                    stroke="var(--hairline-2)"
                     strokeWidth="1"
                   />
                   <text
                     x={tick.x}
                     y={svgData.height - 8}
                     textAnchor="middle"
-                    fill="#78716C"
+                    fill="var(--ink-3)"
                     fontSize="9.5"
                     fontFamily="monospace"
                     fontWeight="500"
@@ -740,14 +682,14 @@ export const ElevationProfileViewer: React.FC<ElevationProfileViewerProps> = ({
                     y1={svgData.padding.top}
                     x2={svgData.trackerX}
                     y2={svgData.height - svgData.padding.bottom}
-                    stroke="#0E6466"
+                    stroke="var(--accent)"
                     strokeWidth="1.5"
                     strokeDasharray="3 3"
                     opacity="0.85"
                   />
 
                   {/* Pulsing Outer Radar Ring */}
-                  <circle cx={svgData.trackerX} cy={svgData.trackerY} r="9" fill="#0E6466" fillOpacity="0.2">
+                  <circle cx={svgData.trackerX} cy={svgData.trackerY} r="9" fill="var(--accent)" fillOpacity="0.2">
                     {!PREFERS_REDUCED_MOTION && (
                       <>
                         <animate attributeName="r" values="6;13;6" dur="2s" repeatCount="indefinite" />
@@ -761,8 +703,8 @@ export const ElevationProfileViewer: React.FC<ElevationProfileViewerProps> = ({
                     cx={svgData.trackerX}
                     cy={svgData.trackerY}
                     r="5.5"
-                    fill="#FFFFFF"
-                    stroke="#0E6466"
+                    fill="var(--surface)"
+                    stroke="var(--accent)"
                     strokeWidth="2.5"
                   />
 
@@ -791,7 +733,7 @@ export const ElevationProfileViewer: React.FC<ElevationProfileViewerProps> = ({
                     cy={hoverPosition.y}
                     r="4.5"
                     fill="#D97706"
-                    stroke="#FFFFFF"
+                    stroke="var(--surface)"
                     strokeWidth="1.5"
                   />
                 </g>
@@ -801,7 +743,7 @@ export const ElevationProfileViewer: React.FC<ElevationProfileViewerProps> = ({
             {/* Hover Tooltip Box */}
             {hoverPosition && (
               <div
-                className="absolute z-30 pointer-events-none transform -translate-x-1/2 -translate-y-full mb-2 bg-stone-900/90 text-white px-2.5 py-1.5 rounded-xl shadow-xl text-[11px] font-mono-numbers backdrop-blur-xs flex items-center gap-2 border border-stone-700"
+                className="absolute z-30 pointer-events-none transform -translate-x-1/2 -translate-y-full mb-2 bg-black/85 text-white px-2.5 py-1.5 rounded-lg shadow-xl text-[11px] font-mono-numbers backdrop-blur-xs flex items-center gap-2 border border-white/15"
                 style={{
                   left: `${(hoverPosition.x / svgData.width) * 100}%`,
                   top: `${(hoverPosition.y / svgData.height) * 100}%`,
@@ -810,7 +752,7 @@ export const ElevationProfileViewer: React.FC<ElevationProfileViewerProps> = ({
                 <div className="flex flex-col">
                   <div className="flex items-center gap-1.5">
                     <span className="font-bold text-amber-400">{formatElevation(hoverPosition.elevationMeters)}</span>
-                    <span className="text-stone-400 text-xs">({formatDistance(hoverPosition.distanceKm)})</span>
+                    <span className="text-ink3 text-xs">({formatDistance(hoverPosition.distanceKm)})</span>
                   </div>
                   <span className="text-xs text-stone-300 font-sans">
                     Slope:{' '}
@@ -826,20 +768,20 @@ export const ElevationProfileViewer: React.FC<ElevationProfileViewerProps> = ({
           /* Empty / Prompt State */
           <div className="h-full flex items-center justify-center p-6 text-center">
             <div className="max-w-md flex flex-col items-center">
-              <div className="w-10 h-10 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mb-2">
+              <div className="w-10 h-10 rounded-lg bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center mb-2">
                 <Mountain className="w-5 h-5" />
               </div>
-              <h4 className="text-xs font-bold text-stone-800 uppercase tracking-wide">
+              <h4 className="text-xs font-bold text-ink tracking-wide">
                 No GPX Terrain Track Loaded
               </h4>
-              <p className="text-xs text-stone-500 mt-1 mb-3">
+              <p className="text-xs text-ink2 mt-1 mb-3">
                 Extract terrain height data from a GPX file or load one of our authentic mountain expeditions to inspect the elevation profile below the map.
               </p>
 
               <div className="flex flex-wrap items-center justify-center gap-2">
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#0E6466] hover:bg-[#094749] text-white text-xs font-semibold shadow-xs transition-colors"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent hover:bg-accent-strong text-white text-xs font-semibold shadow-xs transition-colors"
                 >
                   <Upload className="w-3.5 h-3.5" />
                   <span>Upload .GPX</span>
@@ -847,7 +789,7 @@ export const ElevationProfileViewer: React.FC<ElevationProfileViewerProps> = ({
 
                 <button
                   onClick={() => handleLoadGPXText(SAMPLE_GPX_TRACKS[0].xml, `${SAMPLE_GPX_TRACKS[0].title}.gpx`)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-900 text-xs font-semibold transition-colors"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 text-amber-600 dark:text-amber-400 text-xs font-semibold transition-colors"
                 >
                   <Sparkles className="w-3.5 h-3.5 text-amber-600" />
                   <span>Kilimanjaro Summit (5,895m)</span>
@@ -856,7 +798,7 @@ export const ElevationProfileViewer: React.FC<ElevationProfileViewerProps> = ({
                 <button
                   onClick={handleFetchRealDEM}
                   disabled={isFetchingDEM}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-semibold transition-colors"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-well hover:bg-well text-ink text-xs font-semibold transition-colors"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${isFetchingDEM ? 'animate-spin' : ''}`} />
                   <span>Fetch Real Satellite DEM</span>

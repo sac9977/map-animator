@@ -186,24 +186,24 @@ export const MapLayer: React.FC<MapLayerProps> = ({
         onClick={() => setIsOpen(!isOpen)}
         aria-expanded={isOpen}
         aria-label={`Change map style (current: ${currentTheme.name})`}
-        className="flex items-center gap-2 px-3 py-2 bg-white/95 backdrop-blur-md border border-[#E6E1D7] hover:border-[#0E6466] rounded-xl text-xs font-bold text-stone-800 shadow-md hover:shadow-lg transition-all"
+        className="flex items-center gap-2 px-2.5 py-1.5 bg-surface/90 backdrop-blur-xl border border-hairline2 hover:border-hairline rounded-lg text-xs font-semibold text-ink2 hover:text-ink shadow-sm transition-all"
         title="Change map style"
       >
-        <CurrentIcon className="w-4 h-4 text-[#0E6466]" />
+        <CurrentIcon className="w-4 h-4 text-accent" />
         <span>{currentTheme.name}</span>
-        <span className="text-xs text-[#F59E0B] font-mono font-bold bg-[#FAF8F5] px-1 rounded border border-[#E6E1D7]">
+        <span className="text-xs text-ink2 font-mono font-bold bg-well px-1 rounded border border-hairline">
           {activeStyle === 'cinematic-voyager' ? 'HD Voyager' : 'Layer'}
         </span>
       </button>
 
       {/* Floating Theme Selection Drawer */}
       {isOpen && (
-        <div className="mt-2 bg-white/95 backdrop-blur-md border border-[#E6E1D7] rounded-2xl shadow-xl p-2 w-72 divide-y divide-stone-100 animate-in fade-in zoom-in-95 duration-150">
+        <div className="mt-2 bg-surface/95 backdrop-blur-xl border border-hairline2 rounded-lg shadow-xl p-1.5 w-72 divide-y divide-hairline2 animate-in fade-in zoom-in-95 duration-150">
           <div className="px-2 py-1.5 mb-1 flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-[#0E6466]">
+            <span className="text-xs font-bold text-accent">
               Cartography Themes
             </span>
-            <span className="text-xs text-stone-400 font-mono">Zero API Keys</span>
+            <span className="text-xs text-ink3 font-mono">Zero API Keys</span>
           </div>
 
           <div className="space-y-1 pt-1">
@@ -219,16 +219,16 @@ export const MapLayer: React.FC<MapLayerProps> = ({
                     onStyleChange(key);
                     setIsOpen(false);
                   }}
-                  className={`w-full text-left p-2 rounded-xl transition-all flex items-start justify-between group ${
+                  className={`w-full text-left p-2 rounded-lg transition-all flex items-start justify-between group ${
                     isSelected
-                      ? 'bg-[#0E6466]/10 text-[#0E6466] ring-1 ring-[#0E6466]/30'
-                      : 'hover:bg-stone-50 text-stone-700'
+                      ? 'bg-accent/10 text-accent ring-1 ring-accent/30'
+                      : 'hover:bg-well text-ink'
                   }`}
                 >
                   <div className="flex items-start gap-2">
                     <div
                       className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${
-                        isSelected ? 'bg-[#0E6466] text-white' : 'bg-stone-100 text-stone-600'
+                        isSelected ? 'bg-accent text-white' : 'bg-well text-ink2'
                       }`}
                     >
                       <Icon className="w-3.5 h-3.5" />
@@ -237,14 +237,14 @@ export const MapLayer: React.FC<MapLayerProps> = ({
                       <span className="text-xs font-bold block leading-tight">
                         {theme.name}
                       </span>
-                      <span className="text-xs text-stone-500 block leading-tight mt-0.5">
+                      <span className="text-xs text-ink2 block leading-tight mt-0.5">
                         {theme.subtitle}
                       </span>
                     </div>
                   </div>
 
                   {isSelected && (
-                    <Check className="w-4 h-4 text-[#0E6466] shrink-0 mt-1" />
+                    <Check className="w-4 h-4 text-accent shrink-0 mt-1" />
                   )}
                 </button>
               );

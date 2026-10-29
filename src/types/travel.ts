@@ -62,6 +62,7 @@ export interface JourneyLeg {
   trekConfig?: TrekConfiguration;
   flightInfo?: FlightInfo;
   customIconId?: string; // Specific modern icon ID chosen by user
+  zoomBias?: number; // Transit zoom-out trim in zoom levels; 0/undefined = Auto distance-fit
 }
 
 export type MapTileStyle = 'cinematic-voyager' | 'osm' | 'opentopomap' | 'outdoor' | 'satellite';

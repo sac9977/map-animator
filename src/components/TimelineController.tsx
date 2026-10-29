@@ -1,5 +1,5 @@
 import React from 'react';
-import { Play, Pause, RotateCcw, Video, Compass, Zap, ZoomIn } from 'lucide-react';
+import { Play, Pause, RotateCcw, ZoomIn } from 'lucide-react';
 import { JourneyLeg } from '../types/travel';
 
 interface TimelineControllerProps {
@@ -27,7 +27,6 @@ export const TimelineController: React.FC<TimelineControllerProps> = ({
   onReset,
   legs,
   activeLegIndex,
-  legProgress,
   totalProgress,
   onSeekTotal,
   playbackSpeed,
@@ -40,45 +39,41 @@ export const TimelineController: React.FC<TimelineControllerProps> = ({
   const activeLeg = legs[activeLegIndex];
 
   return (
-    <footer className="h-20 bg-[#FFFFFF] border-t border-[#E6E1D7] px-6 flex items-center justify-between gap-6 z-30 shrink-0 shadow-[0_-2px_12px_-4px_rgba(30,41,59,0.04)]">
-      {/* Play / Pause & Reset Controls */}
-      <div className="flex items-center gap-3 shrink-0">
+    <footer className="h-16 bg-surface/80 backdrop-blur-xl border-t border-hairline2 px-4 flex items-center justify-between gap-5 z-30 shrink-0">
+      {/* Transport controls & readout */}
+      <div className="flex items-center gap-2.5 shrink-0">
         <button
           onClick={onTogglePlay}
           aria-label={isPlaying ? 'Pause animation' : 'Play animation'}
-          className="w-11 h-11 rounded-2xl bg-[#0E6466] hover:bg-[#094749] text-white flex items-center justify-center shadow-md active:scale-95 transition-all"
-          title={isPlaying ? 'Pause Animation' : 'Play Animation'}
+          className="w-9 h-9 rounded-full bg-accent hover:bg-accent-strong text-white flex items-center justify-center active:scale-95 transition-all"
         >
           {isPlaying ? (
-            <Pause className="w-5 h-5 fill-current" />
+            <Pause className="w-4 h-4 fill-current" />
           ) : (
-            <Play className="w-5 h-5 fill-current ml-0.5 text-[#F59E0B]" />
+            <Play className="w-4 h-4 fill-current ml-0.5" />
           )}
         </button>
 
         <button
           onClick={onReset}
           aria-label="Replay from beginning"
-          className="w-9 h-9 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-700 flex items-center justify-center transition-colors"
-          title="Replay from Beginning"
+          className="w-8 h-8 rounded-full bg-well hover:bg-hairline2 text-ink2 hover:text-ink flex items-center justify-center transition-colors"
         >
-          <RotateCcw className="w-4 h-4" />
+          <RotateCcw className="w-3.5 h-3.5" />
         </button>
 
-        {/* Current Time / Total Time */}
-        <div className="flex flex-col">
-          <span className="text-xs font-bold text-stone-800 font-mono-numbers">
-            {currentTimeFormatted} <span className="text-stone-400 font-normal">/ {totalTimeFormatted}</span>
+        <div className="flex flex-col leading-tight hidden sm:flex">
+          <span className="text-[13px] font-semibold text-ink font-mono-numbers">
+            {currentTimeFormatted} <span className="text-ink3 font-normal">/ {totalTimeFormatted}</span>
           </span>
-          <span className="text-xs font-medium text-stone-500 uppercase tracking-wider">
-            {activeLeg ? `Leg ${activeLegIndex + 1}: ${activeLeg.mode.toUpperCase()}` : 'Ready'}
+          <span className="text-[11px] text-ink3 font-mono-numbers">
+            {activeLeg ? `Leg ${activeLegIndex + 1} · ${activeLeg.mode}` : 'Ready'}
           </span>
         </div>
       </div>
 
-      {/* Central Timeline Scrubber */}
+      {/* Scrubber */}
       <div className="flex-1 max-w-2xl flex flex-col justify-center">
-        {/* Scrubber slider */}
         <div className="relative flex items-center group">
           <input
             type="range"
@@ -88,20 +83,14 @@ export const TimelineController: React.FC<TimelineControllerProps> = ({
             value={totalProgress}
             aria-label="Journey timeline scrubber"
             onChange={(e) => onSeekTotal(parseFloat(e.target.value))}
-            className="w-full h-2 bg-stone-200 rounded-lg appearance-none cursor-pointer accent-[#0E6466]"
+            className="w-full"
           />
         </div>
 
-        {/* Leg Waypoint Segment Indicators along the timeline */}
-        <div className="flex justify-between items-center mt-1 px-1 text-xs font-medium text-stone-400">
+        <div className="flex justify-between items-center mt-1 px-0.5 text-[10px] font-medium text-ink3 font-mono-numbers">
           <span>Start</span>
           {legs.map((leg, i) => (
-            <span
-              key={leg.id}
-              className={`transition-colors ${
-                i === activeLegIndex ? 'text-[#0E6466] font-bold' : 'text-stone-400'
-              }`}
-            >
+            <span key={leg.id} className={i === activeLegIndex ? 'text-accent font-semibold' : ''}>
               Leg {i + 1}
             </span>
           ))}
@@ -109,32 +98,35 @@ export const TimelineController: React.FC<TimelineControllerProps> = ({
         </div>
       </div>
 
-      {/* Speed Multiplier & Dynamic Camera Zoom Controls */}
-      <div className="flex items-center gap-4 shrink-0">
-        {/* Dynamic Zooming Toggle (Item 10) */}
+      {/* Camera zoom & speed */}
+      <div className="flex items-center gap-3 shrink-0">
         <button
           onClick={onToggleAutoZoom}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
-            autoZoom
-              ? 'bg-[#0E6466]/10 text-[#0E6466] ring-1 ring-[#0E6466]/30'
-              : 'bg-stone-100 text-stone-500 hover:text-stone-800'
+          aria-pressed={autoZoom}
+          title="Dynamic camera choreography: zooms in at starts and stops, pulls back during transit"
+          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[12px] font-medium transition-colors ${
+            autoZoom ? 'text-accent bg-accent/10' : 'text-ink2 hover:bg-hairline2'
           }`}
-          title="Dynamic Camera Choreography: Zooms in at starts and stops, pulls back during high-speed transit"
         >
-          <ZoomIn className={`w-3.5 h-3.5 ${autoZoom ? 'text-[#F59E0B]' : ''}`} />
-          <span>Dynamic Zoom {autoZoom ? 'ON' : 'OFF'}</span>
+          <ZoomIn className="w-3.5 h-3.5" />
+          <span className="hidden lg:inline">{autoZoom ? 'Dynamic zoom' : 'Static camera'}</span>
         </button>
 
-        {/* Speed Selector */}
-        <div className="flex items-center bg-stone-100 p-1 rounded-xl">
+        <div
+          className="flex items-center bg-well p-0.5 rounded-md"
+          role="radiogroup"
+          aria-label="Playback speed"
+        >
           {SPEED_OPTIONS.map((speed) => (
             <button
               key={speed}
               onClick={() => onChangeSpeed(speed)}
-              className={`px-2 py-1 text-[11px] font-bold rounded-lg transition-all ${
+              role="radio"
+              aria-checked={playbackSpeed === speed}
+              className={`px-2 py-0.5 text-[11px] font-semibold rounded-[5px] transition-all font-mono-numbers ${
                 playbackSpeed === speed
-                  ? 'bg-white text-[#0E6466] shadow-xs'
-                  : 'text-stone-500 hover:text-stone-800'
+                  ? 'bg-surface text-ink shadow-[0_1px_2px_rgba(0,0,0,0.12)]'
+                  : 'text-ink2 hover:text-ink'
               }`}
             >
               {speed}x

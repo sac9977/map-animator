@@ -97,29 +97,29 @@ export const IconPickerModal: React.FC<IconPickerModalProps> = ({
   if (typeof document === 'undefined') return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-4 bg-stone-900/65 backdrop-blur-xs animate-in fade-in duration-150">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
       <div
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="icon-picker-modal-title"
-        className="bg-white border border-[#E6E1D7] rounded-3xl w-full max-w-2xl shadow-2xl flex flex-col max-h-[85vh] sm:max-h-[88vh] overflow-hidden animate-in zoom-in-95 duration-150 relative z-[101] outline-none"
+        className="bg-surface border border-hairline rounded-lg w-full max-w-2xl shadow-2xl flex flex-col max-h-[85vh] sm:max-h-[88vh] overflow-hidden animate-in zoom-in-95 duration-150 relative z-[101] outline-none"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="p-3.5 sm:p-4 border-b border-stone-200 flex items-center justify-between bg-[#FAF8F5] shrink-0">
+        <div className="p-3.5 sm:p-4 border-b border-hairline flex items-center justify-between bg-well shrink-0">
           <div className="flex items-center gap-2.5 sm:gap-3">
-            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-[#0E6466]/10 text-[#0E6466] flex items-center justify-center shadow-xs">
-              <Sparkles className="w-5 h-5 text-[#0E6466]" />
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-accent/10 text-accent flex items-center justify-center shadow-xs">
+              <Sparkles className="w-5 h-5 text-accent" />
             </div>
             <div>
               <h2
                 id="icon-picker-modal-title"
-                className="text-sm sm:text-base font-bold text-stone-900 tracking-tight"
+                className="text-sm sm:text-base font-bold text-ink tracking-tight"
               >
                 Vehicle & Traveler Icon
               </h2>
-              <p className="text-[11px] sm:text-xs text-stone-500 line-clamp-1">
+              <p className="text-[11px] sm:text-xs text-ink2 line-clamp-1">
                 Choose the modern avatar or vehicle representing this leg on the journey map
               </p>
             </div>
@@ -128,7 +128,7 @@ export const IconPickerModal: React.FC<IconPickerModalProps> = ({
           <div className="flex items-center gap-2">
             <button
               onClick={handleApply}
-              className="flex items-center gap-1.5 text-xs font-bold text-white bg-[#0E6466] hover:bg-[#094749] px-3.5 py-1.5 rounded-xl shadow-xs transition-all active:scale-[0.98]"
+              className="flex items-center gap-1.5 text-xs font-bold text-white bg-accent hover:bg-accent-strong px-3.5 py-1.5 rounded-lg shadow-xs transition-all active:scale-[0.98]"
               title="Apply selected icon now"
             >
               <Check className="w-3.5 h-3.5 stroke-[2.5]" />
@@ -137,7 +137,7 @@ export const IconPickerModal: React.FC<IconPickerModalProps> = ({
             <button
               onClick={onClose}
               aria-label="Close icon picker"
-              className="p-1.5 sm:p-2 text-stone-400 hover:text-stone-700 rounded-xl hover:bg-stone-200/50 transition-colors"
+              className="p-1.5 sm:p-2 text-ink3 hover:text-ink rounded-lg hover:bg-well/50 transition-colors"
               title="Close dialog"
             >
               <X className="w-5 h-5" />
@@ -146,11 +146,11 @@ export const IconPickerModal: React.FC<IconPickerModalProps> = ({
         </div>
 
         {/* Live Preview Hero Strip */}
-        <div className="p-4 bg-stone-50 border-b border-stone-200 flex flex-col gap-3">
+        <div className="p-4 bg-well border-b border-hairline flex flex-col gap-3">
           <div className="flex flex-col sm:flex-row items-center gap-4 justify-between">
             <div className="flex items-center gap-3.5 w-full sm:w-auto">
               {/* Active Icon Bubble with Trail Track Preview */}
-              <div className="relative w-16 h-16 rounded-2xl flex items-center justify-center shadow-xs shrink-0 bg-white border border-stone-200 ring-2 ring-[#0E6466]/20 overflow-hidden">
+              <div className="relative w-16 h-16 rounded-lg flex items-center justify-center shadow-xs shrink-0 bg-surface border border-hairline ring-2 ring-accent/20 overflow-hidden">
                 {/* Simulated route trail underneath */}
                 <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 64 64">
                   <path
@@ -181,21 +181,21 @@ export const IconPickerModal: React.FC<IconPickerModalProps> = ({
 
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-bold text-stone-900">{activeIconDef.name}</span>
-                  <span className="text-xs uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-[#0E6466]/10 text-[#0E6466]">
+                  <span className="text-sm font-bold text-ink">{activeIconDef.name}</span>
+                  <span className="text-xs font-bold tracking-wider px-2 py-0.5 rounded-full bg-accent/10 text-accent">
                     {activeIconDef.badge}
                   </span>
                 </div>
-                <p className="text-xs text-stone-500 max-w-sm mt-0.5">{activeIconDef.tagline}</p>
+                <p className="text-xs text-ink2 max-w-sm mt-0.5">{activeIconDef.tagline}</p>
                 <div className="flex items-center gap-2 mt-1">
-                  <span className="inline-flex items-center gap-1 text-[11px] text-stone-500">
-                    <span className="w-2.5 h-2.5 rounded-full border border-stone-300" style={{ backgroundColor: currentColor }} />
-                    Vehicle: <span className="font-mono font-medium text-stone-700">{currentColor}</span>
+                  <span className="inline-flex items-center gap-1 text-[11px] text-ink2">
+                    <span className="w-2.5 h-2.5 rounded-full border border-hairline" style={{ backgroundColor: currentColor }} />
+                    Vehicle: <span className="font-mono font-medium text-ink">{currentColor}</span>
                   </span>
-                  <span className="text-stone-300">·</span>
-                  <span className="inline-flex items-center gap-1 text-[11px] text-stone-500">
-                    <span className="w-2.5 h-2.5 rounded-full border border-stone-300" style={{ backgroundColor: currentTrailColor }} />
-                    Trail: <span className="font-mono font-medium text-stone-700">{currentTrailColor}</span>
+                  <span className="text-ink3">·</span>
+                  <span className="inline-flex items-center gap-1 text-[11px] text-ink2">
+                    <span className="w-2.5 h-2.5 rounded-full border border-hairline" style={{ backgroundColor: currentTrailColor }} />
+                    Trail: <span className="font-mono font-medium text-ink">{currentTrailColor}</span>
                   </span>
                 </div>
               </div>
@@ -203,8 +203,8 @@ export const IconPickerModal: React.FC<IconPickerModalProps> = ({
 
             {/* Scale Slider */}
             {onUpdateScale && (
-              <div className="flex items-center gap-1.5 bg-white px-2.5 py-1.5 rounded-xl border border-stone-200 shadow-2xs self-end sm:self-center">
-                <span className="text-xs font-bold text-stone-400 uppercase">Scale</span>
+              <div className="flex items-center gap-1.5 bg-surface px-2.5 py-1.5 rounded-lg border border-hairline shadow-2xs self-end sm:self-center">
+                <span className="text-xs font-bold text-ink3">Scale</span>
                 <input
                   type="range"
                   aria-label="Vehicle icon scale"
@@ -213,9 +213,9 @@ export const IconPickerModal: React.FC<IconPickerModalProps> = ({
                   step="0.1"
                   value={currentScale}
                   onChange={(e) => onUpdateScale(parseFloat(e.target.value))}
-                  className="w-14 accent-[#0E6466] h-1"
+                  className="w-14 h-1 accent-accent"
                 />
-                <span className="text-xs font-mono font-semibold text-stone-700 w-7">
+                <span className="text-xs font-mono font-semibold text-ink w-7">
                   {currentScale.toFixed(1)}x
                 </span>
               </div>
@@ -223,11 +223,11 @@ export const IconPickerModal: React.FC<IconPickerModalProps> = ({
           </div>
 
           {/* Color Customization Row: Vehicle & Trail Colors */}
-          <div className="pt-2.5 border-t border-stone-200/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs bg-white/70 p-2.5 rounded-2xl border border-stone-200">
+          <div className="pt-2.5 border-t border-hairline/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs bg-surface/70 p-2.5 rounded-lg border border-hairline">
             {/* Vehicle Color Swatches */}
             {onUpdateColor && (
               <div className="flex flex-col gap-1">
-                <span className="text-xs uppercase font-bold tracking-wider text-stone-500">
+                <span className="text-xs font-bold tracking-wider text-ink2">
                   Vehicle Accent Color
                 </span>
                 <div className="flex items-center gap-1.5">
@@ -240,12 +240,12 @@ export const IconPickerModal: React.FC<IconPickerModalProps> = ({
                       aria-label={`Vehicle color ${c}`}
                       className={`w-5 h-5 rounded-full border transition-all ${
                         currentColor.toLowerCase() === c.toLowerCase()
-                          ? 'scale-120 border-stone-900 ring-2 ring-[#0E6466]/40 shadow-xs'
-                          : 'border-stone-300 hover:scale-110'
+                          ? 'scale-120 border-ink ring-2 ring-accent/40 shadow-xs'
+                          : 'border-hairline hover:scale-110'
                       }`}
                     />
                   ))}
-                  <label className="relative w-6 h-6 rounded-full border border-stone-300 flex items-center justify-center cursor-pointer hover:scale-110 transition-transform overflow-hidden bg-gradient-to-tr from-amber-400 via-rose-400 to-teal-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-[#0E6466] focus-within:ring-offset-2" title="Custom vehicle color">
+                  <label className="relative w-6 h-6 rounded-full border border-hairline flex items-center justify-center cursor-pointer hover:scale-110 transition-transform overflow-hidden bg-gradient-to-tr from-amber-400 via-rose-400 to-teal-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-accent focus-within:ring-offset-2" title="Custom vehicle color">
                     <input
                       type="color"
                       value={currentColor}
@@ -262,13 +262,13 @@ export const IconPickerModal: React.FC<IconPickerModalProps> = ({
             {onUpdateTrailColor && (
               <div className="flex flex-col gap-1">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs uppercase font-bold tracking-wider text-stone-500">
+                  <span className="text-xs font-bold tracking-wider text-ink2">
                     Route Trail Color
                   </span>
                   {onUpdateColor && (
                     <button
                       onClick={() => onUpdateTrailColor(currentColor)}
-                      className="text-xs font-semibold text-[#0E6466] hover:underline"
+                      className="text-xs font-semibold text-accent hover:underline"
                     >
                       Match Vehicle
                     </button>
@@ -284,12 +284,12 @@ export const IconPickerModal: React.FC<IconPickerModalProps> = ({
                       aria-label={`Trail color ${p.name} (${p.hex})`}
                       className={`w-5 h-5 rounded-full border transition-all ${
                         currentTrailColor.toLowerCase() === p.hex.toLowerCase()
-                          ? 'scale-120 border-stone-900 ring-2 ring-[#0E6466]/40 shadow-xs'
-                          : 'border-stone-300 hover:scale-110'
+                          ? 'scale-120 border-ink ring-2 ring-accent/40 shadow-xs'
+                          : 'border-hairline hover:scale-110'
                       }`}
                     />
                   ))}
-                  <label className="relative w-6 h-6 rounded-full border border-stone-300 flex items-center justify-center cursor-pointer hover:scale-110 transition-transform overflow-hidden bg-gradient-to-tr from-cyan-400 via-amber-400 to-indigo-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-[#0E6466] focus-within:ring-offset-2" title="Custom trail color">
+                  <label className="relative w-6 h-6 rounded-full border border-hairline flex items-center justify-center cursor-pointer hover:scale-110 transition-transform overflow-hidden bg-gradient-to-tr from-cyan-400 via-amber-400 to-indigo-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-accent focus-within:ring-offset-2" title="Custom trail color">
                     <input
                       type="color"
                       value={currentTrailColor}
@@ -305,20 +305,20 @@ export const IconPickerModal: React.FC<IconPickerModalProps> = ({
         </div>
 
         {/* Filter Tabs & Search Bar */}
-        <div className="p-4 border-b border-stone-200 space-y-3 bg-white">
+        <div className="p-4 border-b border-hairline space-y-3 bg-surface">
           <div className="relative">
-            <Search className="w-4 h-4 text-stone-400 absolute left-3.5 top-3" />
+            <Search className="w-4 h-4 text-ink3 absolute left-3.5 top-3" />
             <input
               type="text"
               placeholder="Search icons (e.g. Backpacker, 4x4, Catamaran, Jet, Runner, Balloon)..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 text-xs bg-stone-50 border border-stone-200 rounded-xl focus:border-[#0E6466]"
+              className="w-full pl-10 pr-4 py-2 text-xs bg-well border border-hairline rounded-lg focus:border-accent"
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
-                className="absolute right-3 top-2.5 text-stone-400 hover:text-stone-700 text-xs"
+                className="absolute right-3 top-2.5 text-ink3 hover:text-ink text-xs"
               >
                 Clear
               </button>
@@ -331,10 +331,10 @@ export const IconPickerModal: React.FC<IconPickerModalProps> = ({
               <button
                 key={cat.id}
                 onClick={() => setSelectedCategory(cat.id)}
-                className={`px-3 py-1.5 rounded-xl font-medium whitespace-nowrap transition-all text-xs ${
+                className={`px-3 py-1.5 rounded-lg font-medium whitespace-nowrap transition-all text-xs ${
                   selectedCategory === cat.id
-                    ? 'bg-[#0E6466] text-white shadow-xs font-semibold'
-                    : 'bg-stone-100 text-stone-600 hover:bg-stone-200 hover:text-stone-900'
+                    ? 'bg-accent text-white shadow-xs font-semibold'
+                    : 'bg-well text-ink2 hover:bg-well hover:text-ink'
                 }`}
               >
                 {cat.label}
@@ -344,7 +344,7 @@ export const IconPickerModal: React.FC<IconPickerModalProps> = ({
         </div>
 
         {/* Icons Grid */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-5 bg-[#FAF8F5]">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-5 bg-well">
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
             {filteredIcons.map((icon) => {
               const isSelected = activeTempId === icon.id;
@@ -363,19 +363,17 @@ export const IconPickerModal: React.FC<IconPickerModalProps> = ({
                   onDoubleClick={handleApply}
                   title="Click to select, click again or double-click to apply"
                   aria-pressed={isSelected}
-                  className={`relative p-3.5 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between ${
+                  className={`relative p-3 rounded-lg border transition-all cursor-pointer flex flex-col justify-between ${
                     isSelected
-                      ? 'bg-white border-[#0E6466] shadow-[0_4px_16px_-4px_rgba(14,100,102,0.2)] ring-2 ring-[#0E6466]'
-                      : 'bg-white border-stone-200 hover:border-stone-400 hover:shadow-xs'
+                      ? 'bg-surface border-accent ring-2 ring-accent/60'
+                      : 'bg-surface border-hairline hover:border-ink3'
                   }`}
                 >
                   {/* Top row: Icon and Badge */}
                   <div className="flex items-start justify-between mb-2">
                     <div
-                      className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all ${
-                        isSelected
-                          ? 'bg-[#0E6466]/10 border border-[#0E6466]/30 shadow-2xs'
-                          : 'bg-white border border-stone-200/80 hover:border-stone-300'
+                      className={`w-12 h-12 rounded-md flex items-center justify-center transition-all ${
+                        isSelected ? 'bg-accent/10' : 'bg-well'
                       }`}
                     >
                       {icon.renderSvg({
@@ -386,11 +384,11 @@ export const IconPickerModal: React.FC<IconPickerModalProps> = ({
                     </div>
 
                     <div className="flex items-center gap-1.5">
-                      <span className="text-[9px] font-semibold tracking-wider uppercase px-2 py-0.5 rounded-md bg-stone-100 text-stone-600">
+                      <span className="text-[9px] font-semibold px-2 py-0.5 rounded-md bg-well text-ink2">
                         {icon.badge}
                       </span>
                       {isSelected && (
-                        <span className="w-5 h-5 rounded-full bg-[#0E6466] text-white flex items-center justify-center shadow-xs">
+                        <span className="w-5 h-5 rounded-full bg-accent text-white flex items-center justify-center shadow-xs">
                           <Check className="w-3 h-3 stroke-[3]" />
                         </span>
                       )}
@@ -402,12 +400,12 @@ export const IconPickerModal: React.FC<IconPickerModalProps> = ({
                     {/* span (not heading): headings are not allowed inside buttons */}
                     <span
                       className={`text-xs font-bold transition-colors ${
-                        isSelected ? 'text-[#0E6466]' : 'text-stone-800'
+                        isSelected ? 'text-accent' : 'text-ink'
                       }`}
                     >
                       {icon.name}
                     </span>
-                    <p className="text-[11px] text-stone-500 mt-0.5 leading-snug line-clamp-2">
+                    <p className="text-[11px] text-ink2 mt-0.5 leading-snug line-clamp-2">
                       {icon.tagline}
                     </p>
                   </div>
@@ -417,19 +415,19 @@ export const IconPickerModal: React.FC<IconPickerModalProps> = ({
           </div>
 
           {filteredIcons.length === 0 && (
-            <div className="p-8 text-center text-stone-400 space-y-2">
-              <Search className="w-8 h-8 mx-auto text-stone-300" />
-              <p className="text-xs font-semibold text-stone-600">No matching traveler icons found</p>
-              <p className="text-[11px] text-stone-400">Try searching for &quot;hiker&quot;, &quot;4x4&quot;, &quot;boat&quot;, or &quot;plane&quot;</p>
+            <div className="p-8 text-center text-ink3 space-y-2">
+              <Search className="w-8 h-8 mx-auto text-ink3" />
+              <p className="text-xs font-semibold text-ink2">No matching traveler icons found</p>
+              <p className="text-[11px] text-ink3">Try searching for &quot;hiker&quot;, &quot;4x4&quot;, &quot;boat&quot;, or &quot;plane&quot;</p>
             </div>
           )}
         </div>
 
         {/* Footer Actions */}
-        <div className="p-3.5 sm:p-4 border-t border-stone-200 bg-white flex items-center justify-between gap-3 shrink-0 shadow-[0_-4px_16px_rgba(0,0,0,0.04)] z-20">
+        <div className="p-3.5 sm:p-4 border-t border-hairline bg-surface flex items-center justify-between gap-3 shrink-0 shadow-[0_-4px_16px_rgba(0,0,0,0.04)] z-20">
           <button
             onClick={handleResetToDefault}
-            className="flex items-center gap-1.5 text-xs font-semibold text-stone-500 hover:text-stone-800 px-3 py-2 rounded-xl hover:bg-stone-100 transition-colors"
+            className="flex items-center gap-1.5 text-xs font-semibold text-ink2 hover:text-ink px-3 py-2 rounded-lg hover:bg-well transition-colors"
           >
             <RotateCcw className="w-3.5 h-3.5" />
             <span>Reset Default</span>
@@ -438,13 +436,13 @@ export const IconPickerModal: React.FC<IconPickerModalProps> = ({
           <div className="flex items-center gap-2">
             <button
               onClick={onClose}
-              className="text-xs font-semibold text-stone-600 hover:text-stone-900 px-4 py-2 rounded-xl hover:bg-stone-100 transition-colors"
+              className="text-xs font-semibold text-ink2 hover:text-ink px-4 py-2 rounded-lg hover:bg-well transition-colors"
             >
               Cancel
             </button>
             <button
               onClick={handleApply}
-              className="flex items-center gap-1.5 text-xs font-bold text-white bg-[#0E6466] hover:bg-[#094749] px-5 py-2.5 rounded-xl shadow-md hover:shadow-lg transition-all active:scale-[0.98]"
+              className="flex items-center gap-1.5 text-xs font-bold text-white bg-accent hover:bg-accent-strong px-5 py-2.5 rounded-lg shadow-md hover:shadow-lg transition-all active:scale-[0.98]"
             >
               <Check className="w-4 h-4 stroke-[2.5]" />
               <span>Apply Icon</span>

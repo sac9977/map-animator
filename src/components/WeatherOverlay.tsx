@@ -166,25 +166,25 @@ export const WeatherOverlay: React.FC<WeatherOverlayProps> = ({
         role="dialog"
         aria-modal="true"
         aria-labelledby="weather-modal-title"
-        className="bg-[#FAF8F5] border border-[#E6E1D7] w-full max-w-5xl max-h-[92vh] rounded-3xl shadow-2xl flex flex-col overflow-hidden text-stone-800 animate-in zoom-in-95 duration-200 outline-none"
+        className="bg-well border border-hairline w-full max-w-5xl max-h-[92vh] rounded-lg shadow-2xl flex flex-col overflow-hidden text-ink animate-in zoom-in-95 duration-200 outline-none"
       >
         
         {/* Header Bar */}
-        <div className="px-6 py-5 bg-[#FFFFFF] border-b border-[#E6E1D7] flex items-center justify-between gap-4 shrink-0">
+        <div className="px-6 py-5 bg-surface border-b border-hairline flex items-center justify-between gap-4 shrink-0">
           <div className="flex items-center gap-3.5">
-            <div className="w-10 h-10 rounded-2xl bg-[#0E6466]/10 text-[#0E6466] flex items-center justify-center shadow-xs">
-              <CloudSun className="w-5 h-5 text-[#0E6466]" strokeWidth={2.2} />
+            <div className="w-10 h-10 rounded-lg bg-accent/10 text-accent flex items-center justify-center shadow-xs">
+              <CloudSun className="w-5 h-5 text-accent" strokeWidth={2.2} />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 id="weather-modal-title" className="text-base font-bold text-stone-900 tracking-tight">
+                <h2 id="weather-modal-title" className="text-base font-bold text-ink tracking-tight">
                   Journey Weather & Climate Overlay
                 </h2>
-                <span className="text-xs font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#0E6466]/10 text-[#0E6466]">
+                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-accent/10 text-accent">
                   Open-Meteo Archive
                 </span>
               </div>
-              <p className="text-xs text-stone-500">
+              <p className="text-xs text-ink2">
                 Historical temperature and precipitation analysis from origin to destination
               </p>
             </div>
@@ -193,14 +193,14 @@ export const WeatherOverlay: React.FC<WeatherOverlayProps> = ({
           {/* Quick Controls & Close */}
           <div className="flex items-center gap-3">
             {/* Units Toggle */}
-            <div className="flex items-center bg-stone-100 p-0.5 rounded-xl border border-stone-200 text-xs font-semibold">
+            <div className="flex items-center bg-well p-0.5 rounded-lg border border-hairline text-xs font-semibold">
               <button
                 onClick={() => setUnit('C')}
                 aria-pressed={unit === 'C'}
                 className={`px-2.5 py-1 rounded-lg transition-all ${
                   unit === 'C'
-                    ? 'bg-[#0E6466] text-white shadow-xs'
-                    : 'text-stone-600 hover:text-stone-900'
+                    ? 'bg-accent text-white shadow-xs'
+                    : 'text-ink2 hover:text-ink'
                 }`}
               >
                 °C, mm
@@ -210,8 +210,8 @@ export const WeatherOverlay: React.FC<WeatherOverlayProps> = ({
                 aria-pressed={unit === 'F'}
                 className={`px-2.5 py-1 rounded-lg transition-all ${
                   unit === 'F'
-                    ? 'bg-[#0E6466] text-white shadow-xs'
-                    : 'text-stone-600 hover:text-stone-900'
+                    ? 'bg-accent text-white shadow-xs'
+                    : 'text-ink2 hover:text-ink'
                 }`}
               >
                 °F, in
@@ -224,7 +224,7 @@ export const WeatherOverlay: React.FC<WeatherOverlayProps> = ({
               disabled={loading}
               title="Refresh weather data"
               aria-label="Refresh weather data"
-              className="p-2 text-stone-500 hover:text-[#0E6466] rounded-xl hover:bg-stone-100 transition-colors disabled:opacity-40"
+              className="p-2 text-ink2 hover:text-accent rounded-lg hover:bg-well transition-colors disabled:opacity-40"
             >
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             </button>
@@ -233,7 +233,7 @@ export const WeatherOverlay: React.FC<WeatherOverlayProps> = ({
             <button
               onClick={onClose}
               aria-label="Close weather overlay"
-              className="p-2 text-stone-400 hover:text-stone-700 rounded-xl hover:bg-stone-100 transition-colors"
+              className="p-2 text-ink3 hover:text-ink rounded-lg hover:bg-well transition-colors"
             >
               <X className="w-5 h-5" />
             </button>
@@ -241,19 +241,19 @@ export const WeatherOverlay: React.FC<WeatherOverlayProps> = ({
         </div>
 
         {/* Origin / Destination Waypoint Context Strip */}
-        <div className="px-6 py-3.5 bg-[#FAF8F5] border-b border-[#E6E1D7] flex flex-wrap items-center justify-between gap-4 text-xs">
+        <div className="px-6 py-3.5 bg-well border-b border-hairline flex flex-wrap items-center justify-between gap-4 text-xs">
           <div className="flex items-center gap-3 flex-wrap">
             {/* Start point chip */}
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white border border-[#E6E1D7] shadow-xs">
-              <span className="w-2.5 h-2.5 rounded-full bg-[#0E6466]" />
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface border border-hairline shadow-xs">
+              <span className="w-2.5 h-2.5 rounded-full bg-accent" />
               <div className="flex flex-col">
-                <span className="text-xs uppercase font-bold text-stone-400">Origin</span>
-                <span className="font-semibold text-stone-800">
+                <span className="text-xs font-bold text-ink3">Origin</span>
+                <span className="font-semibold text-ink">
                   {startPoint.name} {startPoint.country ? `(${startPoint.country})` : ''}
                 </span>
               </div>
               {startClimate?.elevation !== undefined && (
-                <span className="text-xs text-stone-500 bg-stone-100 px-1.5 py-0.5 rounded ml-1 font-mono">
+                <span className="text-xs text-ink2 bg-well px-1.5 py-0.5 rounded ml-1 font-mono">
                   {startClimate.elevation}m
                 </span>
               )}
@@ -261,18 +261,18 @@ export const WeatherOverlay: React.FC<WeatherOverlayProps> = ({
 
             {!isSameLocation && (
               <>
-                <ArrowRight className="w-4 h-4 text-stone-400" />
+                <ArrowRight className="w-4 h-4 text-ink3" />
                 {/* End point chip */}
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white border border-[#E6E1D7] shadow-xs">
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface border border-hairline shadow-xs">
                   <span className="w-2.5 h-2.5 rounded-full bg-[#D97706]" />
                   <div className="flex flex-col">
-                    <span className="text-xs uppercase font-bold text-stone-400">Destination</span>
-                    <span className="font-semibold text-stone-800">
+                    <span className="text-xs font-bold text-ink3">Destination</span>
+                    <span className="font-semibold text-ink">
                       {endPoint.name} {endPoint.country ? `(${endPoint.country})` : ''}
                     </span>
                   </div>
                   {endClimate?.elevation !== undefined && (
-                    <span className="text-xs text-stone-500 bg-stone-100 px-1.5 py-0.5 rounded ml-1 font-mono">
+                    <span className="text-xs text-ink2 bg-well px-1.5 py-0.5 rounded ml-1 font-mono">
                       {endClimate.elevation}m
                     </span>
                   )}
@@ -281,7 +281,7 @@ export const WeatherOverlay: React.FC<WeatherOverlayProps> = ({
             )}
 
             {isSameLocation && (
-              <span className="text-[11px] text-stone-500 italic bg-stone-100/80 px-2 py-1 rounded-lg">
+              <span className="text-[11px] text-ink2 italic bg-well px-2 py-1 rounded-lg">
                 Single-point / Round-trip journey
               </span>
             )}
@@ -289,8 +289,8 @@ export const WeatherOverlay: React.FC<WeatherOverlayProps> = ({
 
           {/* Mode Switcher */}
           <div className="flex items-center gap-2">
-            <span className="text-[11px] font-medium text-stone-500">Timeline:</span>
-            <div className="flex items-center bg-white p-0.5 rounded-xl border border-[#E6E1D7] shadow-xs text-xs font-semibold">
+            <span className="text-[11px] font-medium text-ink2">Timeline:</span>
+            <div className="flex items-center bg-surface p-0.5 rounded-lg border border-hairline shadow-xs text-xs font-semibold">
               <button
                 onClick={() => {
                   setViewMode('monthly');
@@ -298,8 +298,8 @@ export const WeatherOverlay: React.FC<WeatherOverlayProps> = ({
                 }}
                 className={`flex items-center gap-1.5 px-3 py-1 rounded-lg transition-all ${
                   viewMode === 'monthly'
-                    ? 'bg-[#0E6466] text-white shadow-xs'
-                    : 'text-stone-600 hover:text-stone-900'
+                    ? 'bg-accent text-white shadow-xs'
+                    : 'text-ink2 hover:text-ink'
                 }`}
               >
                 <Calendar className="w-3.5 h-3.5" />
@@ -312,8 +312,8 @@ export const WeatherOverlay: React.FC<WeatherOverlayProps> = ({
                 }}
                 className={`flex items-center gap-1.5 px-3 py-1 rounded-lg transition-all ${
                   viewMode === 'daily'
-                    ? 'bg-[#0E6466] text-white shadow-xs'
-                    : 'text-stone-600 hover:text-stone-900'
+                    ? 'bg-accent text-white shadow-xs'
+                    : 'text-ink2 hover:text-ink'
                 }`}
               >
                 <Layers className="w-3.5 h-3.5" />
@@ -326,10 +326,10 @@ export const WeatherOverlay: React.FC<WeatherOverlayProps> = ({
         {/* Scrollable Body */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {loading && (
-            <div className="py-20 flex flex-col items-center justify-center space-y-3 text-stone-500">
-              <RefreshCw className="w-8 h-8 text-[#0E6466] animate-spin" />
+            <div className="py-20 flex flex-col items-center justify-center space-y-3 text-ink2">
+              <RefreshCw className="w-8 h-8 text-accent animate-spin" />
               <p className="text-sm font-medium">Fetching historical meteorological archives...</p>
-              <p className="text-xs text-stone-400">Aggregating temperature bounds and precipitation sum</p>
+              <p className="text-xs text-ink3">Aggregating temperature bounds and precipitation sum</p>
             </div>
           )}
 
@@ -337,18 +337,18 @@ export const WeatherOverlay: React.FC<WeatherOverlayProps> = ({
             <>
               {/* Climate Verdict / Expedition Packing Recommendation Card */}
               {expeditionVerdict && (
-                <div className="p-4 rounded-2xl bg-gradient-to-r from-[#0E6466]/8 via-amber-500/8 to-[#0E6466]/5 border border-[#0E6466]/20 flex items-start gap-3.5">
-                  <div className="w-8 h-8 rounded-xl bg-[#0E6466] text-[#F59E0B] flex items-center justify-center shrink-0 mt-0.5">
+                <div className="p-4 rounded-lg bg-accent/5 border border-accent/20 flex items-start gap-3.5">
+                  <div className="w-8 h-8 rounded-lg bg-accent text-white flex items-center justify-center shrink-0 mt-0.5">
                     <Sparkles className="w-4 h-4" />
                   </div>
                   <div className="flex-1 space-y-1">
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-[#0E6466]">
+                    <h4 className="text-xs font-bold text-accent">
                       Expedition Climate Assessment
                     </h4>
-                    <p className="text-xs text-stone-700 leading-relaxed font-medium">
+                    <p className="text-xs text-ink leading-relaxed font-medium">
                       {expeditionVerdict.seasonAdvice}{' '}
                       {expeditionVerdict.elevationAdvice && (
-                        <span className="text-amber-800 font-semibold">
+                        <span className="text-amber-600 dark:text-amber-400 font-semibold">
                           {expeditionVerdict.elevationAdvice}
                         </span>
                       )}
@@ -360,8 +360,8 @@ export const WeatherOverlay: React.FC<WeatherOverlayProps> = ({
               {/* Chart Series Selector */}
               {!isSameLocation && (
                 <div className="flex items-center justify-between text-xs">
-                  <span className="font-semibold text-stone-700 flex items-center gap-1.5">
-                    <Thermometer className="w-4 h-4 text-[#0E6466]" />
+                  <span className="font-semibold text-ink flex items-center gap-1.5">
+                    <Thermometer className="w-4 h-4 text-accent" />
                     Comparative Meteorological Charts
                   </span>
                   <div className="flex items-center gap-2">
@@ -369,8 +369,8 @@ export const WeatherOverlay: React.FC<WeatherOverlayProps> = ({
                       onClick={() => setActiveSeries('both')}
                       className={`px-2.5 py-1 rounded-lg border text-xs font-medium transition-all ${
                         activeSeries === 'both'
-                          ? 'bg-stone-800 text-white border-stone-800'
-                          : 'bg-white text-stone-600 border-stone-200 hover:border-stone-400'
+                          ? 'bg-ink text-app border-ink'
+                          : 'bg-surface text-ink2 border-hairline hover:border-ink3'
                       }`}
                     >
                       Compare Both
@@ -379,19 +379,19 @@ export const WeatherOverlay: React.FC<WeatherOverlayProps> = ({
                       onClick={() => setActiveSeries('start')}
                       className={`px-2.5 py-1 rounded-lg border text-xs font-medium transition-all flex items-center gap-1.5 ${
                         activeSeries === 'start'
-                          ? 'bg-[#0E6466] text-white border-[#0E6466]'
-                          : 'bg-white text-stone-600 border-stone-200 hover:border-stone-400'
+                          ? 'bg-accent text-white border-accent'
+                          : 'bg-surface text-ink2 border-hairline hover:border-ink3'
                       }`}
                     >
-                      <span className="w-2 h-2 rounded-full bg-[#0E6466]" />
+                      <span className="w-2 h-2 rounded-full bg-accent" />
                       {startPoint.name} Only
                     </button>
                     <button
                       onClick={() => setActiveSeries('end')}
                       className={`px-2.5 py-1 rounded-lg border text-xs font-medium transition-all flex items-center gap-1.5 ${
                         activeSeries === 'end'
-                          ? 'bg-[#D97706] text-white border-[#D97706]'
-                          : 'bg-white text-stone-600 border-stone-200 hover:border-stone-400'
+                          ? 'bg-[#D97706] text-white border-hairline'
+                          : 'bg-surface text-ink2 border-hairline hover:border-ink3'
                       }`}
                     >
                       <span className="w-2 h-2 rounded-full bg-[#D97706]" />
@@ -402,17 +402,17 @@ export const WeatherOverlay: React.FC<WeatherOverlayProps> = ({
               )}
 
               {/* Chart 1: Temperature Trajectory (SVG Responsive Chart) */}
-              <div className="bg-white p-5 rounded-2xl border border-[#E6E1D7] shadow-xs space-y-3">
+              <div className="bg-surface p-5 rounded-lg border border-hairline shadow-xs space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <div className="p-1.5 rounded-lg bg-orange-50 text-orange-600">
                       <Thermometer className="w-4 h-4" />
                     </div>
                     <div>
-                      <h3 className="text-xs font-bold text-stone-900 uppercase tracking-wider">
+                      <h3 className="text-xs font-bold text-ink">
                         Historical Temperature Envelope ({tempUnitLabel})
                       </h3>
-                      <p className="text-[11px] text-stone-500">
+                      <p className="text-[11px] text-ink2">
                         {viewMode === 'monthly'
                           ? 'Monthly average maximum and minimum bounds'
                           : 'Daily maximum and minimum temperatures over past 30 days'}
@@ -424,14 +424,14 @@ export const WeatherOverlay: React.FC<WeatherOverlayProps> = ({
                   <div className="flex items-center gap-4 text-xs">
                     {(activeSeries === 'both' || activeSeries === 'start') && (
                       <div className="flex items-center gap-1.5">
-                        <span className="w-3 h-1 bg-[#0E6466] rounded-full" />
-                        <span className="text-stone-600 font-medium">{startPoint.name}</span>
+                        <span className="w-3 h-1 bg-accent rounded-full" />
+                        <span className="text-ink2 font-medium">{startPoint.name}</span>
                       </div>
                     )}
                     {!isSameLocation && (activeSeries === 'both' || activeSeries === 'end') && (
                       <div className="flex items-center gap-1.5">
                         <span className="w-3 h-1 bg-[#D97706] rounded-full" />
-                        <span className="text-stone-600 font-medium">{endPoint.name}</span>
+                        <span className="text-ink2 font-medium">{endPoint.name}</span>
                       </div>
                     )}
                   </div>
@@ -453,17 +453,17 @@ export const WeatherOverlay: React.FC<WeatherOverlayProps> = ({
               </div>
 
               {/* Chart 2: Precipitation Volume & Rainy Days */}
-              <div className="bg-white p-5 rounded-2xl border border-[#E6E1D7] shadow-xs space-y-3">
+              <div className="bg-surface p-5 rounded-lg border border-hairline shadow-xs space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <div className="p-1.5 rounded-lg bg-blue-50 text-blue-600">
                       <CloudRain className="w-4 h-4" />
                     </div>
                     <div>
-                      <h3 className="text-xs font-bold text-stone-900 uppercase tracking-wider">
+                      <h3 className="text-xs font-bold text-ink">
                         Precipitation Accumulation ({precipUnitLabel})
                       </h3>
-                      <p className="text-[11px] text-stone-500">
+                      <p className="text-[11px] text-ink2">
                         {viewMode === 'monthly'
                           ? 'Monthly rainfall total and frequency of wet days'
                           : 'Daily precipitation measurements'}
@@ -475,14 +475,14 @@ export const WeatherOverlay: React.FC<WeatherOverlayProps> = ({
                   <div className="flex items-center gap-4 text-xs">
                     {(activeSeries === 'both' || activeSeries === 'start') && (
                       <div className="flex items-center gap-1.5">
-                        <span className="w-3 h-3 bg-[#0E6466]/80 rounded-xs" />
-                        <span className="text-stone-600 font-medium">{startPoint.name}</span>
+                        <span className="w-3 h-3 bg-accent/80 rounded-xs" />
+                        <span className="text-ink2 font-medium">{startPoint.name}</span>
                       </div>
                     )}
                     {!isSameLocation && (activeSeries === 'both' || activeSeries === 'end') && (
                       <div className="flex items-center gap-1.5">
                         <span className="w-3 h-3 bg-[#D97706]/80 rounded-xs" />
-                        <span className="text-stone-600 font-medium">{endPoint.name}</span>
+                        <span className="text-ink2 font-medium">{endPoint.name}</span>
                       </div>
                     )}
                   </div>
@@ -530,16 +530,16 @@ export const WeatherOverlay: React.FC<WeatherOverlayProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 bg-white border-t border-[#E6E1D7] flex items-center justify-between text-xs text-stone-500 shrink-0">
+        <div className="px-6 py-4 bg-surface border-t border-hairline flex items-center justify-between text-xs text-ink2 shrink-0">
           <div className="flex items-center gap-2">
-            <Info className="w-3.5 h-3.5 text-stone-400" />
+            <Info className="w-3.5 h-3.5 text-ink3" />
             <span>
               Meteorological historical records sourced via Open-Meteo ECMWF / ERA5-Land Reanalysis.
             </span>
           </div>
           <button
             onClick={onClose}
-            className="px-5 py-2 rounded-xl bg-[#0E6466] hover:bg-[#094749] text-white font-semibold transition-all shadow-xs active:scale-95"
+            className="px-5 py-2 rounded-lg bg-accent hover:bg-accent-strong text-white font-semibold transition-all shadow-xs active:scale-95"
           >
             Close Weather Overlay
           </button>
@@ -702,7 +702,7 @@ const TemperatureSvgChart: React.FC<TempChartProps> = ({
                 x={paddingLeft - 8}
                 y={y + 3}
                 textAnchor="end"
-                className="text-xs fill-stone-400 font-mono"
+                className="text-xs fill-ink3 font-mono"
               >
                 {tickVal}°
               </text>
@@ -770,7 +770,7 @@ const TemperatureSvgChart: React.FC<TempChartProps> = ({
                   x={x}
                   y={height - paddingBottom + 16}
                   textAnchor="middle"
-                  className="text-xs fill-stone-500 font-medium"
+                  className="text-xs fill-ink2 font-medium"
                 >
                   {label}
                 </text>
@@ -870,7 +870,7 @@ const TemperatureSvgChart: React.FC<TempChartProps> = ({
       {/* Interactive Tooltip Card */}
       {hoveredIndex !== null && hoveredIndex >= 0 && hoveredIndex < count && (
         <div
-          className="absolute z-20 top-2 pointer-events-none bg-stone-900/95 text-white backdrop-blur-md px-3 py-2 rounded-xl text-xs shadow-xl border border-stone-700 space-y-1.5 transition-all"
+          className="absolute z-20 top-2 pointer-events-none bg-black/85 text-white backdrop-blur-md px-3 py-2 rounded-lg text-xs shadow-xl border border-white/15 space-y-1.5 transition-all"
           style={{
             left: `${Math.min(
               82,
@@ -879,13 +879,13 @@ const TemperatureSvgChart: React.FC<TempChartProps> = ({
             transform: 'translateX(-50%)',
           }}
         >
-          <div className="font-bold text-stone-200 border-b border-stone-700/60 pb-1 text-[11px] flex items-center justify-between gap-3">
+          <div className="font-bold text-stone-200 border-b border-white/15 pb-1 text-[11px] flex items-center justify-between gap-3">
             <span>
               {isMonthly
                 ? (startItems[hoveredIndex] as MonthlyClimateData).monthName
                 : (startItems[hoveredIndex] as DailyWeatherData).formattedDate}
             </span>
-            <span className="text-[9px] uppercase tracking-wider text-stone-400 font-mono">
+            <span className="text-[9px] text-ink3 font-mono">
               Temperature ({unit === 'C' ? '°C' : '°F'})
             </span>
           </div>
@@ -894,7 +894,7 @@ const TemperatureSvgChart: React.FC<TempChartProps> = ({
             {(activeSeries === 'both' || activeSeries === 'start') && (
               <div className="flex items-center justify-between gap-4">
                 <span className="flex items-center gap-1.5 text-stone-300 font-medium">
-                  <span className="w-2 h-2 rounded-full bg-[#0E6466]" />
+                  <span className="w-2 h-2 rounded-full bg-accent" />
                   {startClimate.locationName}:
                 </span>
                 <span className="font-mono font-semibold text-teal-300">
@@ -1029,7 +1029,7 @@ const PrecipitationSvgChart: React.FC<PrecipChartProps> = ({
                 x={paddingLeft - 8}
                 y={y + 3}
                 textAnchor="end"
-                className="text-xs fill-stone-400 font-mono"
+                className="text-xs fill-ink3 font-mono"
               >
                 {tickVal}{unitLabel}
               </text>
@@ -1073,7 +1073,7 @@ const PrecipitationSvgChart: React.FC<PrecipChartProps> = ({
                   x={slotX + barSlotWidth / 2}
                   y={height - paddingBottom + 16}
                   textAnchor="middle"
-                  className="text-xs fill-stone-500 font-medium"
+                  className="text-xs fill-ink2 font-medium"
                 >
                   {label}
                 </text>
@@ -1131,7 +1131,7 @@ const PrecipitationSvgChart: React.FC<PrecipChartProps> = ({
       {/* Tooltip */}
       {hoveredIndex !== null && hoveredIndex >= 0 && hoveredIndex < count && (
         <div
-          className="absolute z-20 top-2 pointer-events-none bg-stone-900/95 text-white backdrop-blur-md px-3 py-2 rounded-xl text-xs shadow-xl border border-stone-700 space-y-1.5 transition-all"
+          className="absolute z-20 top-2 pointer-events-none bg-black/85 text-white backdrop-blur-md px-3 py-2 rounded-lg text-xs shadow-xl border border-white/15 space-y-1.5 transition-all"
           style={{
             left: `${Math.min(
               82,
@@ -1140,13 +1140,13 @@ const PrecipitationSvgChart: React.FC<PrecipChartProps> = ({
             transform: 'translateX(-50%)',
           }}
         >
-          <div className="font-bold text-stone-200 border-b border-stone-700/60 pb-1 text-[11px] flex items-center justify-between gap-3">
+          <div className="font-bold text-stone-200 border-b border-white/15 pb-1 text-[11px] flex items-center justify-between gap-3">
             <span>
               {isMonthly
                 ? (startItems[hoveredIndex] as MonthlyClimateData).monthName
                 : (startItems[hoveredIndex] as DailyWeatherData).formattedDate}
             </span>
-            <span className="text-[9px] uppercase tracking-wider text-stone-400 font-mono">
+            <span className="text-[9px] text-ink3 font-mono">
               Rainfall ({unitLabel})
             </span>
           </div>
@@ -1155,7 +1155,7 @@ const PrecipitationSvgChart: React.FC<PrecipChartProps> = ({
             {(activeSeries === 'both' || activeSeries === 'start') && (
               <div className="flex items-center justify-between gap-4">
                 <span className="flex items-center gap-1.5 text-stone-300 font-medium">
-                  <span className="w-2 h-2 rounded-full bg-[#0E6466]" />
+                  <span className="w-2 h-2 rounded-full bg-accent" />
                   {startClimate.locationName}:
                 </span>
                 <span className="font-mono font-semibold text-teal-300">
@@ -1164,7 +1164,7 @@ const PrecipitationSvgChart: React.FC<PrecipChartProps> = ({
                       (startItems[hoveredIndex] as DailyWeatherData).precipitation
                   )} {unitLabel}
                   {isMonthly && (
-                    <span className="text-xs text-stone-400 font-normal ml-1">
+                    <span className="text-xs text-ink3 font-normal ml-1">
                       ({(startItems[hoveredIndex] as MonthlyClimateData).rainyDays} rain days)
                     </span>
                   )}
@@ -1184,7 +1184,7 @@ const PrecipitationSvgChart: React.FC<PrecipChartProps> = ({
                       (endItems[hoveredIndex] as DailyWeatherData).precipitation
                   )} {unitLabel}
                   {isMonthly && (
-                    <span className="text-xs text-stone-400 font-normal ml-1">
+                    <span className="text-xs text-ink3 font-normal ml-1">
                       ({(endItems[hoveredIndex] as MonthlyClimateData).rainyDays} rain days)
                     </span>
                   )}
@@ -1223,7 +1223,7 @@ const LocationSummaryCard: React.FC<LocationCardProps> = ({
   const tempUnit = `°${unit}`;
 
   return (
-    <div className="bg-white p-5 rounded-2xl border border-[#E6E1D7] shadow-xs space-y-4">
+    <div className="bg-surface p-5 rounded-lg border border-hairline shadow-xs space-y-4">
       {/* Location Title Header */}
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-2.5">
@@ -1232,17 +1232,17 @@ const LocationSummaryCard: React.FC<LocationCardProps> = ({
             style={{ backgroundColor: color }}
           />
           <div>
-            <span className="text-xs font-bold uppercase tracking-wider text-stone-400 block">
+            <span className="text-xs font-bold text-ink3 block">
               {label}
             </span>
-            <h4 className="text-sm font-bold text-stone-900 tracking-tight">
+            <h4 className="text-sm font-bold text-ink tracking-tight">
               {summary.locationName}
               {summary.country ? `, ${summary.country}` : ''}
             </h4>
           </div>
         </div>
 
-        <span className="text-[11px] font-semibold text-stone-600 bg-stone-100 px-2.5 py-1 rounded-xl">
+        <span className="text-[11px] font-semibold text-ink2 bg-well px-2.5 py-1 rounded-lg">
           {summary.climateType}
         </span>
       </div>
@@ -1250,44 +1250,44 @@ const LocationSummaryCard: React.FC<LocationCardProps> = ({
       {/* Grid of Key Metrics */}
       <div className="grid grid-cols-2 gap-3 text-xs">
         {/* Annual Precipitation */}
-        <div className="p-3 rounded-xl bg-stone-50 border border-stone-100 space-y-1">
-          <span className="text-xs uppercase font-bold text-stone-400 flex items-center gap-1">
+        <div className="p-3 rounded-lg bg-well border border-hairline2 space-y-1">
+          <span className="text-xs font-bold text-ink3 flex items-center gap-1">
             <CloudRain className="w-3 h-3 text-blue-500" />
             Annual Rainfall
           </span>
-          <p className="text-base font-bold text-stone-900 font-mono">
+          <p className="text-base font-bold text-ink font-mono">
             {toPrecip(summary.annualPrecipitation)} {precipUnit}
           </p>
-          <span className="text-xs text-stone-500">
+          <span className="text-xs text-ink2">
             Peak: {summary.wettestMonth.month} ({toPrecip(summary.wettestMonth.precip)} {precipUnit})
           </span>
         </div>
 
         {/* Thermal Range */}
-        <div className="p-3 rounded-xl bg-stone-50 border border-stone-100 space-y-1">
-          <span className="text-xs uppercase font-bold text-stone-400 flex items-center gap-1">
+        <div className="p-3 rounded-lg bg-well border border-hairline2 space-y-1">
+          <span className="text-xs font-bold text-ink3 flex items-center gap-1">
             <Thermometer className="w-3 h-3 text-orange-500" />
             Thermal Extreme
           </span>
-          <p className="text-base font-bold text-stone-900 font-mono">
+          <p className="text-base font-bold text-ink font-mono">
             {toTemp(summary.hottestMonth.temp)}{tempUnit}{' '}
-            <span className="text-xs font-normal text-stone-400">high</span>
+            <span className="text-xs font-normal text-ink3">high</span>
           </p>
-          <span className="text-xs text-stone-500">
+          <span className="text-xs text-ink2">
             Low: {toTemp(summary.coldestMonth.temp)}{tempUnit} ({summary.coldestMonth.month})
           </span>
         </div>
 
         {/* Elevation */}
-        <div className="p-3 rounded-xl bg-stone-50 border border-stone-100 space-y-1">
-          <span className="text-xs uppercase font-bold text-stone-400 flex items-center gap-1">
+        <div className="p-3 rounded-lg bg-well border border-hairline2 space-y-1">
+          <span className="text-xs font-bold text-ink3 flex items-center gap-1">
             <Mountain className="w-3 h-3 text-emerald-600" />
             Elevation
           </span>
-          <p className="text-base font-bold text-stone-900 font-mono">
+          <p className="text-base font-bold text-ink font-mono">
             {summary.elevation !== undefined ? `${summary.elevation} m` : 'Sea level'}
           </p>
-          <span className="text-xs text-stone-500">
+          <span className="text-xs text-ink2">
             {summary.elevation !== undefined && summary.elevation > 1500
               ? 'High-altitude expedition terrain'
               : 'Lowland / Maritime terrain'}
@@ -1295,15 +1295,15 @@ const LocationSummaryCard: React.FC<LocationCardProps> = ({
         </div>
 
         {/* Coordinates */}
-        <div className="p-3 rounded-xl bg-stone-50 border border-stone-100 space-y-1">
-          <span className="text-xs uppercase font-bold text-stone-400 flex items-center gap-1">
-            <Compass className="w-3 h-3 text-stone-500" />
+        <div className="p-3 rounded-lg bg-well border border-hairline2 space-y-1">
+          <span className="text-xs font-bold text-ink3 flex items-center gap-1">
+            <Compass className="w-3 h-3 text-ink2" />
             Coordinates
           </span>
-          <p className="text-xs font-bold text-stone-800 font-mono pt-1">
+          <p className="text-xs font-bold text-ink font-mono pt-1">
             {summary.lat.toFixed(2)}°, {summary.lng.toFixed(2)}°
           </p>
-          <span className="text-xs text-stone-500">
+          <span className="text-xs text-ink2">
             Driest month: {summary.driestMonth.month}
           </span>
         </div>

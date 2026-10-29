@@ -1,6 +1,13 @@
 import React, { useState } from 'react';
 import { X, Film, CheckCircle, Download, Loader2, Sparkles, Monitor, Smartphone, Square } from 'lucide-react';
 import { AspectRatio, JourneyLeg, VideoExportConfig, VideoResolution, Waypoint } from '../types/travel';
+import {
+  CLOSE_ZOOM_FLIGHT,
+  CLOSE_ZOOM_GROUND,
+  transitZoomFor,
+  lngToGlobalPx,
+  latToGlobalPx,
+} from '../utils/cameraZoom';
 import { drawAnimatedVehicle } from '../utils/vehicleDrawers';
 import { calculateBearing, toRad } from '../utils/geoRouting';
 import { hexToRgba, getDefaultTrailColorForMode } from '../data/trailStyles';
@@ -11,27 +18,50 @@ interface ExportModalProps {
   onClose: () => void;
   homeBase: Waypoint;
   legs: JourneyLeg[];
+  aspectRatio: AspectRatio;
+  setAspectRatio: (r: AspectRatio) => void;
+  resolution: VideoResolution;
+  setResolution: (r: VideoResolution) => void;
+  zoomOutBias: number;
+  setZoomOutBias: (b: number) => void;
 }
 
 // Real basemap layers composited into the export background — mirrors the app's
 // default 'Cinematic Voyager' style (satellite imagery + hillshade + labels).
 // Both Esri endpoints send permissive CORS headers, so we can draw them
 // cross-origin into the recording canvas (crossOrigin='anonymous').
-const EXPORT_TILE_LAYERS: { url: string; opacity: number; maxZoom: number }[] = [
+// grade mirrors the live map's pane CSS filters (.leaflet-cinematic-*-pane in
+// index.css); blend replicates the hillshade's mix-blend-mode, which is what
+// keeps the imagery visible through the relief shading.
+const EXPORT_TILE_LAYERS: {
+  url: string;
+  opacity: number;
+  maxZoom: number;
+  grade?: string;
+  blend?: GlobalCompositeOperation;
+  /** Labels are placed differently at every zoom — drawing two zoom levels
+   * during the cross-fade ghosts them. Skip coarse passes for this layer. */
+  noCoarse?: boolean;
+}[] = [
   {
     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
     opacity: 1,
     maxZoom: 19,
+    grade: 'brightness(0.94) contrast(1.26) saturate(0.82) sepia(0.18) hue-rotate(-8deg)',
   },
   {
     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/{z}/{y}/{x}',
     opacity: 0.72,
-    maxZoom: 15,
+    maxZoom: 18,
+    blend: 'multiply',
+    grade: 'contrast(1.45) brightness(1.08)',
   },
   {
     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
     opacity: 0.85,
-    maxZoom: 13,
+    maxZoom: 19,
+    grade: 'contrast(1.3)',
+    noCoarse: true,
   },
 ];
 
@@ -40,26 +70,18 @@ const MAX_TILES_PER_LAYER = 72;
 
 // Total tile budget across every layer for the dynamic-zoom camera pyramid
 // (unique tiles only; keeps memory and network sane for a full render)
-const MAX_TOTAL_TILES = 2200;
+const MAX_TOTAL_TILES = 3600;
 
-// Export camera choreography — mirrors MapViewport's Dynamic Zoom exactly
-// (close-up at starts/stops, pulled back during transit, smoothstep easing)
-const CLOSE_ZOOM_FLIGHT = 9.5;
-const OVERVIEW_ZOOM_FLIGHT = 5.5;
-const CLOSE_ZOOM_GROUND = 12.8;
-const OVERVIEW_ZOOM_GROUND = 8.2;
-const CAMERA_CENTER_RATE = 18; // exponential damping, 1/s — same as the live map
-const CAMERA_ZOOM_RATE = 12;
+// Camera constants + Mercator helpers live in utils/cameraZoom, shared with
+// MapViewport so the live preview shows exactly the framing the video renders.
+// The final leg glides in only part way — eased to a slightly wider arrival
+// so pale coastal imagery (e.g. ferry arrivals) keeps depth and colour.
+const FINAL_LEG_ARRIVAL = 0.4;
+// 12 frames ≈ 0.4s @30fps — frame-based so the fade spans the
+// same number of RECORDED frames regardless of compositing speed.
+const TILE_FADE_FRAMES = 12;
 
-// Web-Mercator helpers (same projection the Leaflet map uses, so tiles align
-// exactly with route geometry drawn on the export canvas)
-const lngToGlobalPx = (lng: number, worldSize: number) => ((lng + 180) / 360) * worldSize;
-const latToGlobalPx = (lat: number, worldSize: number) => {
-  const s = Math.max(-0.9999, Math.min(0.9999, Math.sin(toRad(lat))));
-  return (0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI)) * worldSize;
-};
-
-const RESOLUTION_DIMS: Record<AspectRatio, Record<VideoResolution, { width: number; height: number }>> = {
+export const RESOLUTION_DIMS: Record<AspectRatio, Record<VideoResolution, { width: number; height: number }>> = {
   '16:9': {
     '4K': { width: 3840, height: 2160 },
     '1080p': { width: 1920, height: 1080 },
@@ -87,9 +109,13 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   onClose,
   homeBase,
   legs,
+  aspectRatio,
+  setAspectRatio,
+  resolution,
+  setResolution,
+  zoomOutBias,
+  setZoomOutBias,
 }) => {
-  const [aspectRatio, setAspectRatio] = useState<AspectRatio>('16:9');
-  const [resolution, setResolution] = useState<VideoResolution>('1080p');
   const [fps, setFps] = useState<30 | 60>(30);
   const [isRendering, setIsRendering] = useState(false);
   const [renderProgress, setRenderProgress] = useState(0);
@@ -121,6 +147,23 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     const W = currentDims.width;
     const H = currentDims.height;
 
+    // Timer-throttling escape hatch: when the preview tab is hidden, page
+    // setTimeout is clamped to ~1 s, which obliterates the wall-clock pacing
+    // (the recorder then stretches the journey to minutes at ~1 fps). Worker
+    // timers are not throttled, so every wait goes through a tiny worker.
+    const paceWorker = new Worker(
+      URL.createObjectURL(
+        new Blob(['onmessage=(e)=>setTimeout(()=>postMessage(e.data),e.data);'], {
+          type: 'text/javascript',
+        })
+      )
+    );
+    const paced = (ms: number) =>
+      new Promise<void>((resolve) => {
+        paceWorker.onmessage = () => resolve();
+        paceWorker.postMessage(ms);
+      });
+
     const canvas = document.createElement('canvas');
     canvas.width = W;
     canvas.height = H;
@@ -129,6 +172,10 @@ export const ExportModal: React.FC<ExportModalProps> = ({
       setIsRendering(false);
       return;
     }
+    // Richer texture capture: draw levels are ceil-based (tiles are
+    // downsampled, never upscaled), so resampling quality matters.
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
 
     // Bounding box of the whole journey (drives the route-overview camera)
     const allCoords: [number, number][] = [[homeBase.lat, homeBase.lng]];
@@ -181,60 +228,159 @@ export const ExportModal: React.FC<ExportModalProps> = ({
       zoom: fitZoom + Math.log2(fitScale),
     };
 
-    // ---- Camera choreography (target mirror of the live Dynamic Zoom) ----
-    // Global shift subtracted from every zoom target to satisfy the tile budget.
+    // ---- Camera choreography ----
+    // Targets come from per-leg keyframes (departure close-up, mid-leg transit
+    // pull-back, arrival glide-in) interpolated with cubic Hermite curves —
+    // C¹-continuous, so there are no velocity spikes or whip-zooms at leg
+    // boundaries. Shifts applied only to satisfy the tile budget: the transit
+    // framing pays first (it is the widest, most tile-hungry view) while the
+    // close-up framing keeps its native depth so departure/arrival shots
+    // capture the map's rich texture.
     let zoomShift = 0;
+    let closeShift = 0;
     let dynamicZoom = useDynamicZoom;
 
-    const cameraTargetAt = (timeSec: number): { lat: number; lng: number; zoom: number } => {
-      if (legs.length === 0) return { ...routeCam };
+    const zoomsFor = (leg: JourneyLeg) => {
+      const isFlight = leg.mode === 'flight';
+      const close = Math.max(2, (isFlight ? CLOSE_ZOOM_FLIGHT : CLOSE_ZOOM_GROUND) - closeShift);
+      // Per-leg trim (set in the leg editor) wins; legs on Auto (0/untouched)
+      // fall back to the export modal's zoom-out slider.
+      const bias = leg.zoomBias || zoomOutBias;
+      return { over: transitZoomFor(leg, W, H, bias, closeShift, TILE_SIZE), close };
+    };
+
+    const pathAt = (leg: JourneyLeg, t: number) => {
+      if (leg.cachedPath && leg.cachedPath.length >= 2) {
+        const path = leg.cachedPath;
+        const f = t * (path.length - 1);
+        const lo = Math.floor(f);
+        const hi = Math.min(path.length - 1, lo + 1);
+        const fr = f - lo;
+        return {
+          lat: path[lo][0] + (path[hi][0] - path[lo][0]) * fr,
+          lng: path[lo][1] + (path[hi][1] - path[lo][1]) * fr,
+        };
+      }
+      return { lat: leg.to.lat, lng: leg.to.lng };
+    };
+
+    // Keyframes over the whole journey: leg start (departure close-up), leg
+    // midpoint (transit overview), leg end (arrival zoom). The final leg's
+    // arrival glides in only part of the way (FINAL_LEG_ARRIVAL) so light
+    // coastal imagery keeps depth and colour.
+    interface CamKey { t: number; lat: number; lng: number; zoom: number; }
+    let camKeys: CamKey[] = [];
+    const buildCamKeys = () => {
+      camKeys = [];
+      if (legs.length === 0) {
+        camKeys.push({ t: 0, ...routeCam });
+        return;
+      }
       let accumulated = 0;
-      for (let i = 0; i < legs.length; i++) {
-        const legTotal = legs[i].durationSeconds + legs[i].pauseAtDestinationSeconds;
-        if (timeSec <= accumulated + legTotal || i === legs.length - 1) {
-          const leg = legs[i];
-          const inside = Math.max(0, timeSec - accumulated);
-          const legT = leg.durationSeconds > 0 ? Math.min(1, inside / leg.durationSeconds) : 1;
-
-          // Position: sub-frame interpolation along the same cachedPath the vehicle uses
-          let lat = leg.to.lat;
-          let lng = leg.to.lng;
-          if (leg.cachedPath && leg.cachedPath.length >= 2) {
-            const path = leg.cachedPath;
-            const f = legT * (path.length - 1);
-            const lo = Math.floor(f);
-            const hi = Math.min(path.length - 1, lo + 1);
-            const fr = f - lo;
-            lat = path[lo][0] + (path[hi][0] - path[lo][0]) * fr;
-            lng = path[lo][1] + (path[hi][1] - path[lo][1]) * fr;
+      legs.forEach((leg, i) => {
+        const dur = leg.durationSeconds;
+        const legTotal = dur + leg.pauseAtDestinationSeconds;
+        if (legTotal > 0.05) {
+          const { over, close } = zoomsFor(leg);
+          const start = pathAt(leg, 0);
+          const isLast = i === legs.length - 1;
+          const arrival = isLast ? over + FINAL_LEG_ARRIVAL * (close - over) : close;
+          if (camKeys.length === 0 || camKeys[camKeys.length - 1].t < accumulated) {
+            // Between-legs glide: the pause repositions the camera from the
+            // previous arrival to this departure. At close-up zoom that pan
+            // strobes across the intervening ground, so pull out mid-pause
+            // to fit the gap's span — zoom out, glide, zoom back in.
+            const prev = camKeys[camKeys.length - 1];
+            const pauseT = prev ? accumulated - prev.t : 0;
+            if (prev && pauseT > 1) {
+              const gws = TILE_SIZE;
+              const gx = lngToGlobalPx(start.lng, gws) - lngToGlobalPx(prev.lng, gws);
+              const gy = latToGlobalPx(start.lat, gws) - latToGlobalPx(prev.lat, gws);
+              const gapFit = Math.log2((Math.min(W, H) * 0.6) / Math.max(Math.hypot(gx, gy), 1e-6));
+              camKeys.push({
+                t: prev.t + pauseT / 2,
+                lat: (prev.lat + start.lat) / 2,
+                lng: (prev.lng + start.lng) / 2,
+                zoom: Math.max(2, Math.min(prev.zoom, close, gapFit)),
+              });
+            }
+            camKeys.push({ t: accumulated, lat: start.lat, lng: start.lng, zoom: close });
           }
-
-          // Zoom: close-up at departure, pull back mid-transit, glide in at arrival
-          const isFlight = leg.mode === 'flight';
-          const over = (isFlight ? OVERVIEW_ZOOM_FLIGHT : OVERVIEW_ZOOM_GROUND) - zoomShift;
-          const close = (isFlight ? CLOSE_ZOOM_FLIGHT : CLOSE_ZOOM_GROUND) - zoomShift;
-          let zoom = close;
-          if (legT < 0.22) {
-            const t = legT / 0.22;
-            const ease = t * t * (3 - 2 * t);
-            zoom = close - ease * (close - over);
-          } else if (legT > 0.78) {
-            const t = (legT - 0.78) / 0.22;
-            const ease = t * t * (3 - 2 * t);
-            zoom = over + ease * (close - over);
-          } else {
-            zoom = over;
+          if (dur > 0.05) {
+            // Intermediate keys sit ON the route path (not the chord between
+            // waypoints), so the camera tracks curved legs and the vehicle
+            // never leaves the frame mid-transit.
+            [0.25, 0.5, 0.75].forEach((frac) => {
+              const p = pathAt(leg, frac);
+              camKeys.push({ t: accumulated + dur * frac, lat: p.lat, lng: p.lng, zoom: over });
+            });
+            camKeys.push({
+              t: accumulated + dur,
+              lat: leg.to.lat,
+              lng: leg.to.lng,
+              zoom: arrival,
+            });
           }
-          // Pull-back safety floor: never frame wider than the route overview.
-          // The pre-spawned base tile levels cover exactly this framing, so the
-          // camera can never reveal un-tiled area (beige fallback or a mosaic
-          // edge) when it pulls back mid-transit.
-          zoom = Math.max(zoom, routeCam.zoom);
-          return { lat, lng, zoom };
         }
         accumulated += legTotal;
-      }
-      return { ...routeCam };
+      });
+      if (camKeys.length === 0) camKeys.push({ t: 0, ...routeCam });
+    };
+
+    // Cubic Hermite (finite-difference Catmull-Rom tangents) between adjacent
+    // keys — smooth in position AND zoom, evaluable at any timestamp.
+    const hermite = (u: number, p1: number, p2: number, m1: number, m2: number) => {
+      const u2 = u * u;
+      const u3 = u2 * u;
+      return (
+        (2 * u3 - 3 * u2 + 1) * p1 +
+        (u3 - 2 * u2 + u) * m1 +
+        (-2 * u3 + 3 * u2) * p2 +
+        (u3 - u2) * m2
+      );
+    };
+
+    const cameraTargetAt = (timeSec: number): { lat: number; lng: number; zoom: number } => {
+      if (camKeys.length === 1) return { ...camKeys[0] };
+      let i1 = 0;
+      while (i1 < camKeys.length - 2 && timeSec > camKeys[i1 + 1].t) i1++;
+      const k1 = camKeys[i1];
+      const k2 = camKeys[i1 + 1];
+      const k0 = camKeys[i1 - 1] ?? k1;
+      const k3 = camKeys[i1 + 2] ?? k2;
+      const span = Math.max(k2.t - k1.t, 1e-6);
+      const u = Math.min(Math.max(0, (timeSec - k1.t) / span), 1);
+      const lerpTangent = (c0: number, c2: number, t0: number, t2: number) => {
+        const dt = Math.max(t2 - t0, 1e-3);
+        return ((c2 - c0) / dt) * span;
+      };
+      const lat = hermite(
+        u,
+        k1.lat,
+        k2.lat,
+        k1.lat === k2.lat && k2.t === k1.t ? 0 : lerpTangent(k0.lat, k2.lat, k0.t, k2.t),
+        k1.lat === k2.lat && k2.t === k1.t ? 0 : lerpTangent(k1.lat, k3.lat, k1.t, k3.t)
+      );
+      const lng = hermite(
+        u,
+        k1.lng,
+        k2.lng,
+        k1.lng === k2.lng && k2.t === k1.t ? 0 : lerpTangent(k0.lng, k2.lng, k0.t, k2.t),
+        k1.lng === k2.lng && k2.t === k1.t ? 0 : lerpTangent(k1.lng, k3.lng, k1.t, k3.t)
+      );
+      const zoomRaw = hermite(
+        u,
+        k1.zoom,
+        k2.zoom,
+        k1.zoom === k2.zoom && k2.t === k1.t ? 0 : lerpTangent(k0.zoom, k2.zoom, k0.t, k2.t),
+        k1.zoom === k2.zoom && k2.t === k1.t ? 0 : lerpTangent(k1.zoom, k3.zoom, k1.t, k3.t)
+      );
+      // Pull-back safety floor: never frame wider than the route overview.
+      // The pre-spawned base tile levels cover exactly this framing, so the
+      // camera can never reveal un-tiled area (beige fallback or a mosaic
+      // edge) when it pulls back mid-transit.
+      const z = zoomRaw;
+      return { lat, lng, zoom: Math.max(z, routeCam.zoom) };
     };
 
     // Visible integer-tile window at the camera's fractional zoom, projected
@@ -257,16 +403,30 @@ export const ExportModal: React.FC<ExportModalProps> = ({
       return { n, x0, x1, y0, y1, tileWorld, camX, camY };
     };
 
-    // Estimate unique tile downloads across every layer for a candidate
-    // zoom shift. Synchronous — sets zoomShift so cameraTargetAt picks it up.
-    const estimateCameraTiles = (shift: number): number => {
+    // Deepest drawable integer level for a camera zoom. At close range (z ≥
+    // 8) ceil() keeps tiles downsampled — never upscaled — so texture stays
+    // crisp at fractional zooms. At wide views round() stays: upsampling a
+    // 1080p pixel there is invisible, and ceil would roughly double the tile
+    // budget of every transit pull-back.
+    const levelFor = (layer: { maxZoom: number }, camZoom: number) =>
+      Math.max(
+        1,
+        Math.min(layer.maxZoom, camZoom >= 8 ? Math.ceil(camZoom) : Math.round(camZoom))
+      );
+
+    // Estimate unique tile downloads across every layer for candidate zoom
+    // shifts. Synchronous — sets both shifts and rebuilds keyframes so the
+    // cameraTargetAt picks them up.
+    const estimateCameraTiles = (shift = zoomShift, cShift = closeShift): number => {
       zoomShift = shift;
+      closeShift = cShift;
+      buildCamKeys();
       const unions = EXPORT_TILE_LAYERS.map(() => new Set<string>());
       const step = Math.max(1, Math.floor(totalFrames / 90));
       for (let f = 0; f <= totalFrames; f += step) {
         const cam = cameraTargetAt((f / totalFrames) * duration);
         EXPORT_TILE_LAYERS.forEach((layer, li) => {
-          const zL = Math.max(1, Math.min(layer.maxZoom, Math.round(cam.zoom)));
+          const zL = levelFor(layer, cam.zoom);
           const r = visibleTileRange(cam, zL);
           for (let ty = r.y0; ty <= r.y1; ty++) {
             for (let tx = r.x0; tx <= r.x1; tx++) {
@@ -278,39 +438,91 @@ export const ExportModal: React.FC<ExportModalProps> = ({
       return unions.reduce((sum, s) => sum + s.size, 0);
     };
 
-    // Fit the corridor within the total tile budget by pulling the camera back
-    // in 0.5-zoom steps (dynamics preserved, field of view widened, fewer tiles).
+    // Fit the corridor within the total tile budget in two stages so the map's
+    // richest detail survives: first pull back the transit framing (the widest
+    // view, which dominates the tile count), and only if the rewrite still
+    // exceeds the budget lower the close-ups as well.
     if (dynamicZoom) {
-      while (estimateCameraTiles(zoomShift) > MAX_TOTAL_TILES) {
-        if (zoomShift >= 5.5) {
-          dynamicZoom = false;
-          zoomShift = 0;
-          break;
-        }
+      const STAGE1_CAP = 4;
+      while (estimateCameraTiles(zoomShift) > MAX_TOTAL_TILES && zoomShift < STAGE1_CAP) {
         zoomShift += 0.5;
       }
-      zoomShift = dynamicZoom ? zoomShift : 0;
+      if (estimateCameraTiles(zoomShift) > MAX_TOTAL_TILES) {
+        while (closeShift < 3 && estimateCameraTiles(zoomShift, closeShift + 0.5) > MAX_TOTAL_TILES) {
+          closeShift += 0.5;
+        }
+        if (estimateCameraTiles(zoomShift, closeShift) > MAX_TOTAL_TILES) {
+          dynamicZoom = false;
+        }
+      }
+      if (!dynamicZoom) {
+        zoomShift = 0;
+        closeShift = 0;
+      }
     }
+    // Lock the shift values in and build the final keyframe curve.
+    estimateCameraTiles(dynamicZoom ? zoomShift : 0, closeShift);
 
     // ---- On-demand tile pyramid ----
     const tileCache = new Map<string, Promise<HTMLImageElement | null>>();
     const tileImages = new Map<string, HTMLImageElement | null>();
-    const loadTile = (layerUrl: string, z: number, x: number, y: number) => {
+    // Decoded GPU-resident copy of each tile — decoding during the frame loop
+    // would stall the recorder, so every arriving tile is pre-decoded once.
+    const tileBitmaps = new Map<string, ImageBitmap | null>();
+    // When each tile was first drawn — fine-level tiles cross-fade in over
+    // TILE_FADE_MS; tiles pre-warmed during prefetch start fully aged.
+    const tileFirstSeen = new Map<string, number>();
+    const loadTile = (layerUrl: string, z: number, x: number, y: number, aged = false) => {
       const key = `${layerUrl}|${z}|${x}|${y}`;
       let p = tileCache.get(key);
       if (!p) {
         p = new Promise<HTMLImageElement | null>((resolve) => {
-          const img = new Image();
-          img.crossOrigin = 'anonymous';
-          img.onload = () => resolve(img);
-          img.onerror = () => resolve(null);
-          img.src = layerUrl
-            .replace('{z}', String(z))
-            .replace('{y}', String(y))
-            .replace('{x}', String(x));
+          // Resilient fetch: a single failed request used to silently drop the
+          // whole imagery layer from the render (pale hillshade-only frames).
+          // Retry a few times, alternating with the mirror Esri host.
+          const altUrl = layerUrl.replace('server.arcgisonline', 'services.arcgisonline');
+          const urls = [layerUrl, altUrl, layerUrl, altUrl];
+          const attempt = (queue: string[]) => {
+            if (queue.length === 0) {
+              console.warn(`Export tile gave up after retries: z${z}/${x}/${y}`);
+              resolve(null);
+              return;
+            }
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            img.onload = () => resolve(img);
+            img.onerror = () => setTimeout(() => attempt(queue.slice(1)), 500);
+            img.src = queue[0]
+              .replace('{z}', String(z))
+              .replace('{y}', String(y))
+              .replace('{x}', String(x));
+          };
+          attempt(urls);
         });
         p.then((img) => {
           tileImages.set(key, img);
+          if (aged) tileFirstSeen.set(key, Number.NEGATIVE_INFINITY);
+          if (img) {
+            // Bake the layer grade into the bitmap once instead of running
+            // canvas ctx.filter over every tile of every frame — this is what
+            // brings per-frame compositing under the real-time frame budget.
+            const layer = EXPORT_TILE_LAYERS.find((l) => l.url === layerUrl);
+            if (layer?.grade) {
+              const c = document.createElement('canvas');
+              c.width = TILE_SIZE;
+              c.height = TILE_SIZE;
+              const g = c.getContext('2d')!;
+              g.filter = layer.grade;
+              g.drawImage(img, 0, 0);
+              createImageBitmap(c)
+                .then((bm) => tileBitmaps.set(key, bm))
+                .catch(() => tileBitmaps.set(key, null));
+            } else {
+              createImageBitmap(img)
+                .then((bm) => tileBitmaps.set(key, bm))
+                .catch(() => tileBitmaps.set(key, null));
+            }
+          }
         });
         tileCache.set(key, p);
       }
@@ -319,8 +531,10 @@ export const ExportModal: React.FC<ExportModalProps> = ({
 
     // Pre-spawn the whole camera-corridor's tiles, first-use ordered, so the
     // render paces into mostly-warm caches. Concurrency-capped worker pool.
-    if (dynamicZoom) {
-      const jobs: { layerUrl: string; z: number; x: number; y: number }[] = [];
+    // Runs for static exports too: the route-framed background must be warm
+    // before frame 0, or every frame fetches tiles inline and stalls pacing.
+    {
+      const jobs: { layerUrl: string; z: number; x: number; y: number; aged: boolean }[] = [];
       const seen = new Set<string>();
       // Base coverage first: the entire route bbox at the overview zoom and one
       // level deeper. These guarantee every camera position has imagery to draw
@@ -341,7 +555,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
             if (seen.has(key)) continue;
             seen.add(key);
             EXPORT_TILE_LAYERS.forEach((layer) => {
-              jobs.push({ layerUrl: layer.url, z: bz, x: tx, y: ty });
+              jobs.push({ layerUrl: layer.url, z: bz, x: tx, y: ty, aged: true });
             });
           }
         }
@@ -349,74 +563,157 @@ export const ExportModal: React.FC<ExportModalProps> = ({
       for (let f = 0; f <= totalFrames; f += 4) {
         const cam = cameraTargetAt((f / totalFrames) * duration);
         EXPORT_TILE_LAYERS.forEach((layer) => {
-          const zL = Math.max(1, Math.min(layer.maxZoom, Math.round(cam.zoom)));
+          const zL = levelFor(layer, cam.zoom);
           const r = visibleTileRange(cam, zL);
           for (let ty = r.y0; ty <= r.y1; ty++) {
             for (let tx = r.x0; tx <= r.x1; tx++) {
               const key = `${zL}/${tx}/${ty}`;
               if (seen.has(key)) continue;
               seen.add(key);
-              jobs.push({ layerUrl: layer.url, z: zL, x: tx, y: ty });
+              jobs.push({ layerUrl: layer.url, z: zL, x: tx, y: ty, aged: false });
             }
           }
         });
       }
       let jobIdx = 0;
+      // When the warm-up bound expires, the remaining corridor tiles load
+      // on demand from the frame loop instead. The workers must STOP then:
+      // a queue that keeps submitting through the recording starves the
+      // frame loop's edge tiles behind hundreds of queued requests (the
+      // browser serves ~6 per host), which showed as flat fallback bands
+      // at the frame's leading edge during transit.
+      let prefetchStopped = false;
       const workerCount = 12;
       const worker = async () => {
-        while (jobIdx < jobs.length) {
+        while (jobIdx < jobs.length && !prefetchStopped) {
           const j = jobs[jobIdx++];
-          await loadTile(j.layerUrl, j.z, j.x, j.y);
+          await loadTile(j.layerUrl, j.z, j.x, j.y, j.aged);
         }
       };
       const prefetchDone = Promise.all(
         Array.from({ length: workerCount }, () => worker())
       );
-      // Give the opening frame a moment of imagery before the recorder starts
+      // Warm the FULL pyramid before the recorder starts. MediaRecorder paces
+      // in wall-clock time, so a mid-render frame that waits on a network tile
+      // shows a frozen canvas — that is the jerky zoom. Bounded to 45 s so a
+      // dead network still renders (with the coarse base coverage).
       await Promise.race([
         prefetchDone,
-        new Promise((r) => setTimeout(r, 500)),
+        paced(45000).then(() => {
+          prefetchStopped = true;
+        }),
       ]);
+      // Let pending createImageBitmap decodes settle before frame 0.
+      await paced(300);
     }
 
     // Composite one frame's basemap into the recording canvas: fill fallback,
     // then draw whatever tile pyramid entries are already loaded for a
     // per-layer integer zoom, clamped to each layer's deepest native mosaic.
-    const drawBasemap = (cam: { lat: number; lng: number; zoom: number }) => {
+    // Camera-adjacent fine tiles cross-fade in over the always-complete coarse
+    // coverage (a zoom-level change is a soft sharpen instead of a pop). When
+    // the fine pass both covers the frame and is fully faded in, the coarse
+    // passes are skipped entirely — only the visible layer remains drawn.
+    const drawBasemap = (cam: { lat: number; lng: number; zoom: number }, frame: number) => {
       ctx.fillStyle = '#EBE5DA';
       ctx.fillRect(0, 0, W, H);
       EXPORT_TILE_LAYERS.forEach((layer) => {
-        const zL = Math.max(1, Math.min(layer.maxZoom, Math.round(cam.zoom)));
-        // Coarse-to-fine passes: the preloaded base levels always cover the
-        // visible area, so missing corridor tiles appear as slightly blurrier
-        // imagery for a moment instead of a blank fallback color.
-        const passZooms = new Set<number>([zL, fitZoom]);
-        if (zL > 1) passZooms.add(zL - 1);
-        if (fitZoom + 1 < zL) passZooms.add(fitZoom + 1);
-        const passes = [...passZooms]
-          .filter((z) => z >= 1 && z <= layer.maxZoom)
-          .sort((a, b) => a - b);
-        for (const zp of passes) {
-          const r = zp === zL ? visibleTileRange(cam, zp) : visibleTileRange(cam, zp);
-          for (let ty = r.y0; ty <= r.y1; ty++) {
-            for (let tx = r.x0; tx <= r.x1; tx++) {
-              const key = `${layer.url}|${zp}|${tx}|${ty}`;
-              if (!tileImages.has(key)) {
-                if (!tileCache.has(key) && zp === zL) loadTile(layer.url, zp, tx, ty);
-                continue;
+        const zL = levelFor(layer, cam.zoom);
+        // Mirror the live map's per-layer compositing ('Cinematic Voyager'):
+        // the grade-filtered draw and the multiply-blended hillshade are what
+        // keep the imagery rich instead of buried under plain-alpha shading.
+        // Grade is pre-baked into each tile bitmap (see loadTile) — no
+        // per-frame ctx.filter, which is what keeps compositing real-time.
+        // Reset per layer: without this the label layer inherits the
+        // hillshade's 'multiply' and its colors get crushed.
+        ctx.globalCompositeOperation = layer.blend ?? 'source-over';
+        type Entry = { bm: ImageBitmap | HTMLImageElement; px: number; py: number; size: number; alpha: number };
+        const fine: Entry[] = [];
+        let fineBlocking = false; // missing tiles or still mid-fade
+        const rF = visibleTileRange(cam, zL);
+        for (let ty = rF.y0; ty <= rF.y1; ty++) {
+          for (let tx = rF.x0; tx <= rF.x1; tx++) {
+            const key = `${layer.url}|${zL}|${tx}|${ty}`;
+            const img = tileImages.get(key);
+            const bm = tileBitmaps.get(key) ?? null;
+            if (!tileImages.has(key)) {
+              fineBlocking = true;
+              if (!tileCache.has(key)) loadTile(layer.url, zL, tx, ty);
+              continue;
+            }
+            if (!img || !bm) {
+              fineBlocking = true; // decode not finished yet
+              continue;
+            }
+            let alpha = layer.opacity;
+            // Fine (native-level) tiles fade in over the coarse passes;
+            // anything warmed before the render starts is pre-aged.
+            const seen = tileFirstSeen.get(key);
+            if (seen === undefined) {
+              tileFirstSeen.set(key, frame);
+              alpha = 0;
+            } else {
+              const f01 = Math.min(1, Math.max(0, (frame - seen) / TILE_FADE_FRAMES));
+              alpha *= f01 * f01 * (3 - 2 * f01);
+            }
+            if (alpha < 0.999) fineBlocking = true;
+            fine.push({
+              bm,
+              px: tx * rF.tileWorld - (rF.camX - W / 2),
+              py: ty * rF.tileWorld - (rF.camY - H / 2),
+              size: rF.tileWorld + 1, // +1px hides seams
+              alpha,
+            });
+          }
+        }
+        // Coarse Base Layers sit beneath the fine pass: the preloaded base
+        // levels always cover the visible area, so missing corridor tiles or a
+        // mid-fade sharpen read as release-soft imagery for a moment instead
+        // of a blank fallback color or a hard pop.
+        if (fineBlocking && !layer.noCoarse) {
+          const passZooms = new Set<number>([fitZoom]);
+          if (zL > 1) passZooms.add(zL - 1);
+          if (fitZoom + 1 < zL) passZooms.add(fitZoom + 1);
+          const passes = [...passZooms]
+            .filter((z) => z >= 1 && z < zL)
+            .sort((a, b) => a - b);
+          for (const zp of passes) {
+            const r = visibleTileRange(cam, zp);
+            for (let ty = r.y0; ty <= r.y1; ty++) {
+              for (let tx = r.x0; tx <= r.x1; tx++) {
+                const key = `${layer.url}|${zp}|${tx}|${ty}`;
+                const bm = tileBitmaps.get(key) ?? null;
+                if (!tileImages.has(key)) {
+                  if (!tileCache.has(key)) loadTile(layer.url, zp, tx, ty);
+                  continue;
+                }
+                if (!bm) continue;
+                const px = tx * r.tileWorld - (r.camX - W / 2);
+                const py = ty * r.tileWorld - (r.camY - H / 2);
+                const size = r.tileWorld + 1; // +1px hides seams
+                ctx.globalAlpha = layer.opacity;
+                ctx.drawImage(bm, px, py, size, size);
               }
-              const img = tileImages.get(key);
-              if (!img) continue;
-              const px = tx * r.tileWorld - (r.camX - W / 2);
-              const py = ty * r.tileWorld - (r.camY - H / 2);
-              const size = r.tileWorld + 1; // +1px hides seams
-              ctx.globalAlpha = layer.opacity;
-              ctx.drawImage(img, px, py, size, size);
             }
           }
         }
+        for (const e of fine) {
+          ctx.globalAlpha = e.alpha;
+          ctx.drawImage(e.bm, e.px, e.py, e.size, e.size);
+        }
       });
+      // Reset per-layer compositing before anything else draws on top.
       ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.filter = 'none';
+      // Atmospheric bone & teal tint — mirrors .leaflet-cinematic-overlay-tint.
+      const tint = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, Math.max(W, H) * 0.75);
+      tint.addColorStop(0, 'rgba(226, 219, 208, 0.08)');
+      tint.addColorStop(1, 'rgba(14, 100, 102, 0.14)');
+      ctx.globalCompositeOperation = 'color';
+      ctx.fillStyle = tint;
+      ctx.fillRect(0, 0, W, H);
+      ctx.globalCompositeOperation = 'source-over';
     };
 
     // Camera state (damped follow position + fractional zoom for the frame loop)
@@ -431,7 +728,9 @@ export const ExportModal: React.FC<ExportModalProps> = ({
 
     const recorder = new MediaRecorder(stream, {
       mimeType,
-      videoBitsPerSecond: resolution === '4K' ? 25_000_000 : 10_000_000,
+      // Higher bitrate so the encoder doesn't smear the map texture during
+      // camera motion (pan + zoom keeps nearly every pixel changing).
+      videoBitsPerSecond: resolution === '4K' ? 32_000_000 : 16_000_000,
     });
 
     const recordedChunks: Blob[] = [];
@@ -458,19 +757,13 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     for (let frame = 0; frame <= totalFrames; frame++) {
       const progress = frame / totalFrames;
       const currentTimeSec = progress * duration;
-      const dt = 1 / fps;
 
-      // Camera state: dynamic zoom glides toward the live-app target with the
-      // same exponential damping; static keeps the fixed route-overview view.
+      // Camera state: the Hermite target curve is already C¹-smooth in both
+      // position and zoom, so the camera tracks it exactly. Exponential damping
+      // used to lag behind and then rush to catch up — that lag-and-rush is
+      // what read as a jerky zoom. Static keeps the fixed route-overview view.
       if (dynamicZoom) {
-        const target = cameraTargetAt(currentTimeSec);
-        const aC = 1 - Math.exp(-CAMERA_CENTER_RATE * dt);
-        const aZ = 1 - Math.exp(-CAMERA_ZOOM_RATE * dt);
-        camCurrent = {
-          lat: camCurrent.lat + (target.lat - camCurrent.lat) * aC,
-          lng: camCurrent.lng + (target.lng - camCurrent.lng) * aC,
-          zoom: camCurrent.zoom + (target.zoom - camCurrent.zoom) * aZ,
-        };
+        camCurrent = cameraTargetAt(currentTimeSec);
       } else {
         camCurrent = { ...routeCam };
       }
@@ -480,7 +773,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
       // as huge upscaled pixels (blurry labels, visible seams).
       const frameTileJobs: Promise<HTMLImageElement | null>[] = [];
       EXPORT_TILE_LAYERS.forEach((layer) => {
-        const zL = Math.max(1, Math.min(layer.maxZoom, Math.round(camCurrent.zoom)));
+        const zL = levelFor(layer, camCurrent.zoom);
         const r = visibleTileRange(camCurrent, zL);
         for (let ty = r.y0; ty <= r.y1; ty++) {
           for (let tx = r.x0; tx <= r.x1; tx++) {
@@ -488,9 +781,17 @@ export const ExportModal: React.FC<ExportModalProps> = ({
           }
         }
       });
-      await Promise.all(frameTileJobs);
+      // Waits are capped: with the pyramid fully warmed this returns instantly,
+      // but a single slow tile must never freeze the wall-clock pacing. The
+      // cap uses an ordinary page timer — it must NOT go through the pacing
+      // worker, where a canceled-looking 300 ms post from every frame would
+      // spam the queue and instantly release later real pacing waits.
+      await Promise.race([
+        Promise.all(frameTileJobs),
+        new Promise((r) => setTimeout(r, 300)),
+      ]);
 
-      drawBasemap(camCurrent);
+      drawBasemap(camCurrent, frame);
 
       // Overlay geometry projected through the same camera transform
       const camWorldSize = TILE_SIZE * Math.pow(2, camCurrent.zoom);
@@ -595,30 +896,35 @@ export const ExportModal: React.FC<ExportModalProps> = ({
         });
       }
 
-      // Title & Expedition Watermark
-      ctx.fillStyle = '#0E6466';
-      ctx.font = `bold ${Math.round(W * 0.024)}px "Plus Jakarta Sans", sans-serif`;
+      // Title & Expedition Watermark (Apple brand: system blue + system font)
+      ctx.save();
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.55)';
+      ctx.shadowBlur = 8;
+      ctx.fillStyle = '#0A84FF';
+      ctx.font = `600 ${Math.round(W * 0.022)}px -apple-system, "SF Pro Display", system-ui, "Helvetica Neue", Arial, sans-serif`;
       ctx.fillText(`EXPEDITION JOURNEY · ${homeBase.name}`, 60, H - 70);
 
-      ctx.fillStyle = '#78716C';
-      ctx.font = `500 ${Math.round(W * 0.014)}px "JetBrains Mono", monospace`;
-      ctx.fillText(`ANIMATED WITH MAPANIMATOR · ${W}x${H} @ ${fps}FPS`, 60, H - 40);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.72)';
+      ctx.font = `500 ${Math.round(W * 0.012)}px -apple-system, "SF Pro Text", system-ui, "Helvetica Neue", Arial, sans-serif`;
+      ctx.fillText('ANIMATED WITH MAPANIMATOR', 60, H - 40);
+      ctx.restore();
 
       // Real-time pacing: MediaRecorder records wall-clock time, so the
       // renderer waits for each frame's true timestamp instead of racing.
       const targetMs = startedAt + (frame * 1000) / fps;
       const wait = targetMs - performance.now();
       if (wait > 0) {
-        await new Promise((r) => setTimeout(r, wait));
+        await paced(wait);
       }
 
       // Report render progress
       if (frame % 5 === 0) {
         setRenderProgress(Math.round((frame / totalFrames) * 100));
-        await new Promise((r) => setTimeout(r, 0));
+        await Promise.resolve();
       }
     }
 
+    paceWorker.terminate();
     recorder.stop();
   };
 
@@ -629,17 +935,17 @@ export const ExportModal: React.FC<ExportModalProps> = ({
         role="dialog"
         aria-modal="true"
         aria-labelledby="export-modal-title"
-        className="bg-[#FFFFFF] border border-[#E6E1D7] w-full max-w-xl rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 outline-none"
+        className="bg-surface border border-hairline w-full max-w-xl rounded-lg shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 outline-none"
       >
         {/* Modal Header */}
-        <div className="px-6 py-4 border-b border-[#E6E1D7] bg-[#FAF8F5] flex items-center justify-between">
+        <div className="px-6 py-4 border-b border-hairline bg-well flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-[#0E6466] text-[#F59E0B] flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-accent text-ink2 flex items-center justify-center">
               <Film className="w-4 h-4" />
             </div>
             <div>
-              <h3 id="export-modal-title" className="text-base font-bold text-stone-900">Video Render Studio</h3>
-              <p className="text-xs text-stone-500">Configure resolution, aspect ratio, and frame rate</p>
+              <h3 id="export-modal-title" className="text-base font-bold text-ink">Video Render Studio</h3>
+              <p className="text-xs text-ink2">Configure resolution, aspect ratio, and frame rate</p>
             </div>
           </div>
 
@@ -647,7 +953,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
             onClick={onClose}
             disabled={isRendering}
             aria-label="Close render studio"
-            className="p-1.5 text-stone-400 hover:text-stone-700 rounded-xl hover:bg-stone-200/60 transition-colors"
+            className="p-1.5 text-ink3 hover:text-ink rounded-lg hover:bg-well/60 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -657,7 +963,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
         <div className="p-6 space-y-5">
           {/* 1. Aspect Ratio */}
           <div>
-            <label className="text-xs font-bold uppercase tracking-wider text-[#0E6466] block mb-2">
+            <label className="text-xs font-bold text-accent block mb-2">
               1. Aspect Ratio
             </label>
             <div className="grid grid-cols-4 gap-2">
@@ -672,15 +978,15 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                   onClick={() => setAspectRatio(ratio)}
                   disabled={isRendering}
                   aria-pressed={aspectRatio === ratio}
-                  className={`p-3 rounded-2xl border text-center transition-all flex flex-col items-center justify-center gap-1 ${
+                  className={`p-3 rounded-lg border text-center transition-all flex flex-col items-center justify-center gap-1 ${
                     aspectRatio === ratio
-                      ? 'border-[#0E6466] bg-[#0E6466]/5 text-[#0E6466] ring-1 ring-[#0E6466]'
-                      : 'border-stone-200 hover:border-stone-400 text-stone-700 bg-stone-50'
+                      ? 'border-accent bg-accent/5 text-accent ring-1 ring-accent'
+                      : 'border-hairline hover:border-ink3 text-ink bg-well'
                   }`}
                 >
                   <Icon className="w-4 h-4 mb-0.5" />
                   <span className="text-xs font-bold">{ratio}</span>
-                  <span className="text-xs text-stone-400">{sub}</span>
+                  <span className="text-xs text-ink3">{sub}</span>
                 </button>
               ))}
             </div>
@@ -688,7 +994,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
 
           {/* 2. Quality & Resolution */}
           <div>
-            <label className="text-xs font-bold uppercase tracking-wider text-[#0E6466] block mb-2">
+            <label className="text-xs font-bold text-accent block mb-2">
               2. Resolution Quality
             </label>
             <div className="grid grid-cols-3 gap-2">
@@ -702,19 +1008,19 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                   onClick={() => setResolution(res)}
                   disabled={isRendering}
                   aria-pressed={resolution === res}
-                  className={`p-3 rounded-2xl border text-left transition-all ${
+                  className={`p-3 rounded-lg border text-left transition-all ${
                     resolution === res
-                      ? 'border-[#0E6466] bg-[#0E6466]/5 text-[#0E6466] ring-1 ring-[#0E6466]'
-                      : 'border-stone-200 hover:border-stone-400 text-stone-700 bg-stone-50'
+                      ? 'border-accent bg-accent/5 text-accent ring-1 ring-accent'
+                      : 'border-hairline hover:border-ink3 text-ink bg-well'
                   }`}
                 >
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-xs font-bold">{label}</span>
-                    <span className="text-[9px] bg-stone-200 text-stone-600 px-1 rounded font-mono">
+                    <span className="text-[9px] bg-well text-ink2 px-1 rounded font-mono">
                       {badge}
                     </span>
                   </div>
-                  <span className="text-xs text-stone-400 font-mono-numbers">
+                  <span className="text-xs text-ink3 font-mono-numbers">
                     {RESOLUTION_DIMS[aspectRatio][res].width} × {RESOLUTION_DIMS[aspectRatio][res].height}
                   </span>
                 </button>
@@ -724,7 +1030,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
 
           {/* 3. Framerate */}
           <div>
-            <label className="text-xs font-bold uppercase tracking-wider text-[#0E6466] block mb-2">
+            <label className="text-xs font-bold text-accent block mb-2">
               3. Frame Rate
             </label>
             <div className="flex items-center gap-3">
@@ -737,14 +1043,14 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                   onClick={() => setFps(val)}
                   disabled={isRendering}
                   aria-pressed={fps === val}
-                  className={`flex-1 p-2.5 rounded-xl border flex items-center justify-between text-xs font-semibold ${
+                  className={`flex-1 p-2.5 rounded-lg border flex items-center justify-between text-xs font-semibold ${
                     fps === val
-                      ? 'border-[#0E6466] bg-[#0E6466]/5 text-[#0E6466] ring-1 ring-[#0E6466]'
-                      : 'border-stone-200 text-stone-700 hover:bg-stone-50'
+                      ? 'border-accent bg-accent/5 text-accent ring-1 ring-accent'
+                      : 'border-hairline text-ink hover:bg-well'
                   }`}
                 >
                   <span>{label}</span>
-                  <span className="text-xs text-stone-400 font-normal">{desc}</span>
+                  <span className="text-xs text-ink3 font-normal">{desc}</span>
                 </button>
               ))}
             </div>
@@ -752,7 +1058,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
 
           {/* 4. Camera Motion */}
           <div>
-            <label className="text-xs font-bold uppercase tracking-wider text-[#0E6466] block mb-2">
+            <label className="text-xs font-bold text-accent block mb-2">
               4. Camera Motion
             </label>
             <button
@@ -760,34 +1066,58 @@ export const ExportModal: React.FC<ExportModalProps> = ({
               onClick={() => setUseDynamicZoom((v) => !v)}
               disabled={isRendering}
               aria-pressed={useDynamicZoom}
-              className={`w-full flex items-center justify-between p-3 rounded-2xl border transition-all ${
+              className={`w-full flex items-center justify-between p-3 rounded-lg border transition-all ${
                 useDynamicZoom
-                  ? 'border-[#0E6466] bg-[#0E6466]/5 text-[#0E6466] ring-1 ring-[#0E6466]'
-                  : 'border-stone-200 hover:border-stone-400 text-stone-700 bg-stone-50'
+                  ? 'border-accent bg-accent/5 text-accent ring-1 ring-accent'
+                  : 'border-hairline hover:border-ink3 text-ink bg-well'
               }`}
             >
               <span className="flex items-center gap-2">
                 <span className="text-xs font-bold">Dynamic Zoom</span>
-                <span className="text-xs text-stone-400">Follow the vehicle with cinematic close-ups and pull-backs</span>
+                <span className="text-xs text-ink3">Follow the vehicle with cinematic close-ups and pull-backs</span>
               </span>
-              <span className={`text-xs font-bold ${useDynamicZoom ? 'text-[#0E6466]' : 'text-stone-400'}`}>
+              <span className={`text-xs font-bold ${useDynamicZoom ? 'text-accent' : 'text-ink3'}`}>
                 {useDynamicZoom ? 'ON' : 'OFF'}
               </span>
             </button>
+            {useDynamicZoom && (
+              <div className="mt-2 p-3 rounded-lg border border-hairline bg-well">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-xs font-bold text-ink">Zoom-out</span>
+                  <span className="text-xs font-bold text-accent tabular-nums">
+                    {zoomOutBias === 0 ? 'Auto' : `${zoomOutBias > 0 ? '+' : ''}${zoomOutBias.toFixed(2)}`}
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min={-3}
+                  max={3}
+                  step={0.25}
+                  value={zoomOutBias}
+                  disabled={isRendering}
+                  onChange={(e) => setZoomOutBias(Number(e.target.value))}
+                  aria-label="Transit zoom-out adjustment, zoom levels; 0 fits each leg's distance automatically"
+                  className="w-full accent-blue-500"
+                />
+                <span className="block text-[10px] text-ink3 mt-1">
+                  Default for legs set to Auto · negative tightens · positive widens
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Render Progress or Download Button */}
           {isRendering ? (
             <div
               aria-live="polite"
-              className="bg-[#FAF8F5] border border-[#E6E1D7] rounded-2xl p-4 space-y-2"
+              className="bg-well border border-hairline rounded-lg p-4 space-y-2"
             >
-              <div className="flex items-center justify-between text-xs font-bold text-stone-700">
+              <div className="flex items-center justify-between text-xs font-bold text-ink">
                 <span className="flex items-center gap-2">
-                  <Loader2 className="w-4 h-4 animate-spin text-[#0E6466]" />
+                  <Loader2 className="w-4 h-4 animate-spin text-accent" />
                   <span>Synthesizing Frame-by-Frame Video...</span>
                 </span>
-                <span className="font-mono-numbers text-[#0E6466]">{renderProgress}%</span>
+                <span className="font-mono-numbers text-accent">{renderProgress}%</span>
               </div>
               <div
                 role="progressbar"
@@ -795,14 +1125,14 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                 aria-valuemin={0}
                 aria-valuemax={100}
                 aria-valuenow={renderProgress}
-                className="w-full h-2 bg-stone-200 rounded-full overflow-hidden"
+                className="w-full h-2 bg-well rounded-full overflow-hidden"
               >
                 <div
-                  className="h-full bg-[#0E6466] transition-all duration-150"
+                  className="h-full bg-accent transition-all duration-150"
                   style={{ width: `${renderProgress}%` }}
                 />
               </div>
-              <p className="text-xs text-stone-400 text-center">
+              <p className="text-xs text-ink3 text-center">
                 Rendering {currentDims.width}x{currentDims.height} @ {fps}fps with synchronized camera easing
               </p>
             </div>
@@ -810,7 +1140,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
             <div
               role="status"
               aria-live="polite"
-              className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-center justify-between"
+              className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 flex items-center justify-between"
             >
               <div className="flex items-center gap-3">
                 <CheckCircle className="w-6 h-6 text-emerald-600" />
@@ -822,7 +1152,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
               <a
                 href={downloadUrl}
                 download={downloadFilename}
-                className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-sm transition-colors"
+                className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg shadow-sm transition-colors"
               >
                 <Download className="w-4 h-4" />
                 <span>Save Video</span>
@@ -832,8 +1162,8 @@ export const ExportModal: React.FC<ExportModalProps> = ({
         </div>
 
         {/* Modal Footer */}
-        <div className="px-6 py-4 border-t border-[#E6E1D7] bg-[#FAF8F5] flex items-center justify-between">
-          <span className="text-xs text-stone-500 font-mono-numbers">
+        <div className="px-6 py-4 border-t border-hairline bg-well flex items-center justify-between">
+          <span className="text-xs text-ink2 font-mono-numbers">
             Output: {currentDims.width}x{currentDims.height} @ {fps}fps
           </span>
 
@@ -841,16 +1171,16 @@ export const ExportModal: React.FC<ExportModalProps> = ({
             <button
               onClick={onClose}
               disabled={isRendering}
-              className="px-4 py-2 text-xs font-semibold text-stone-600 hover:text-stone-900 rounded-xl transition-colors"
+              className="px-4 py-2 text-xs font-semibold text-ink2 hover:text-ink rounded-lg transition-colors"
             >
               Cancel
             </button>
             <button
               onClick={handleStartRender}
               disabled={isRendering}
-              className="flex items-center gap-2 px-5 py-2.5 bg-[#0E6466] hover:bg-[#094749] text-white text-xs font-bold rounded-xl shadow-md transition-all active:scale-95 disabled:opacity-50"
+              className="flex items-center gap-2 px-5 py-2.5 bg-accent hover:bg-accent-strong text-white text-xs font-bold rounded-lg shadow-md transition-all active:scale-95 disabled:opacity-50"
             >
-              <Sparkles className="w-4 h-4 text-[#F59E0B]" />
+              <Sparkles className="w-4 h-4 text-ink2" />
               <span>{isRendering ? 'Rendering...' : 'Start Video Render'}</span>
             </button>
           </div>
