@@ -11,8 +11,10 @@ export default defineConfig(() => {
       tailwindcss(),
       VitePWA({
         registerType: 'autoUpdate',
+        // No SW in dev: the dev SW caches unhashed modules, so code edits can
+        // serve stale bundles forever (caused invisible transport icons).
         devOptions: {
-          enabled: true,
+          enabled: false,
         },
         manifest: {
           id: '/',
