@@ -484,10 +484,24 @@ export function parseGPX(xmlText: string): ParsedGPXResult {
 }
 
 /**
- * Geocode place search via OpenStreetMap Nominatim
+ * Geocode place search via OpenStreetMap Nominatim.
+ * Nominatim needs an exact-ish name, so if nothing matches we retry with
+ * progressively shorter leading phrases ("Masai Mara National Park" ->
+ * "Masai Mara National" -> "Masai Mara").
  */
 export async function searchPlaceOSM(query: string): Promise<Waypoint[]> {
   if (!query || query.trim().length < 2) return [];
+  const results = await nominatimSearch(query);
+  if (results.length > 0) return results;
+  const words = query.trim().split(/\s+/);
+  for (let n = Math.min(words.length - 1, 2); n >= 2; n--) {
+    const retry = await nominatimSearch(words.slice(0, n).join(' '));
+    if (retry.length > 0) return retry;
+  }
+  return [];
+}
+
+async function nominatimSearch(query: string): Promise<Waypoint[]> {
   const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
     query
   )}&limit=6&addressdetails=1`;

@@ -117,6 +117,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const [isHomeSearchOpen, setIsHomeSearchOpen] = useState(false);
   const [homeQuery, setHomeQuery] = useState('');
+  // Search staleness guards: each keystroke fires an async search, so an
+  // older, slower response can otherwise overwrite the results of a newer
+  // query (the "picked the wrong place" bug).
+  const homeSearchSeqRef = useRef(0);
+  const destSearchSeqRef = useRef(0);
   const [homeResults, setHomeResults] = useState<Waypoint[]>([]);
   const [isSearchingHome, setIsSearchingHome] = useState(false);
 
@@ -161,13 +166,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { name: 'Mombasa Coastal Port', lat: -4.043, lng: 39.668, country: 'Kenya' },
   ];
 
-  // Search home locations
+  // Search home locations (debounced; stale responses are dropped)
   const handleSearchHome = async (query: string) => {
     setHomeQuery(query);
+    const seq = ++homeSearchSeqRef.current;
     if (query.trim().length < 2) {
       setHomeResults([]);
       return;
     }
+    await new Promise(r => setTimeout(r, 350));
+    if (seq !== homeSearchSeqRef.current) return;
     setIsSearchingHome(true);
     const airports = searchAirports(query).map(a => ({
       id: `apt-${a.iata.toLowerCase()}`,
@@ -178,17 +186,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
       airportCode: a.iata,
     }));
     const places = await searchPlaceOSM(query);
+    if (seq !== homeSearchSeqRef.current) return;
     setHomeResults([...airports, ...places]);
     setIsSearchingHome(false);
   };
 
-  // Search leg destination locations
+  // Search leg destination locations (debounced; stale responses are dropped)
   const handleSearchDest = async (query: string) => {
     setDestQuery(query);
+    const seq = ++destSearchSeqRef.current;
     if (query.trim().length < 2) {
       setDestResults([]);
       return;
     }
+    await new Promise(r => setTimeout(r, 350));
+    if (seq !== destSearchSeqRef.current) return;
     setIsSearchingDest(true);
     const airports = searchAirports(query).map(a => ({
       id: `apt-${a.iata.toLowerCase()}`,
@@ -199,6 +211,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       airportCode: a.iata,
     }));
     const places = await searchPlaceOSM(query);
+    if (seq !== destSearchSeqRef.current) return;
     setDestResults([...airports, ...places]);
     setIsSearchingDest(false);
   };
