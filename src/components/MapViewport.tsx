@@ -81,6 +81,18 @@ export const MapViewport: React.FC<MapViewportProps> = ({
     redrawQueuedRef.current = true;
     requestAnimationFrame(() => {
       redrawQueuedRef.current = false;
+      const canvas = canvasRef.current;
+      // A leaflet-animated zoom leaves a CSS scale on the canvas (zoomanim).
+      // If a redraw then happens mid-flight (flyTo re-fires 'move' every
+      // frame, wheel, drag), the fresh content would composite through the
+      // stale scale+transition and the whole overlay visually shifts.
+      // Redraws are always in current container coordinates, so the
+      // transform must go before drawing. Pure 250ms zoom animations don't
+      // fire 'move' mid-flight, so they're untouched by this.
+      if (canvas && canvas.style.transform && canvas.style.transform !== 'none') {
+        canvas.style.transition = 'none';
+        canvas.style.transform = 'none';
+      }
       drawOverlayRef.current();
     });
   }, []);
@@ -221,11 +233,14 @@ export const MapViewport: React.FC<MapViewportProps> = ({
 
     if (coords.length > 0) {
       const bounds = L.latLngBounds(coords.map(c => L.latLng(c[0], c[1])));
-      map.flyToBounds(bounds, {
+      // Instant fit: Leaflet repositions tiles on a ~200ms throttle during an
+      // animated flyTo while the overlay canvas redraws per-frame, so the
+      // canvas leads the tiles by hundreds of px mid-flight and the route
+      // appears "not anchored". A snap keeps overlay and tiles 1:1.
+      map.fitBounds(bounds, {
         padding: [60, 60],
         maxZoom: 13,
-        duration: 1.2,
-        easeLinearity: 0.25,
+        animate: false,
       });
     }
   }, [homeBase, legs]);
