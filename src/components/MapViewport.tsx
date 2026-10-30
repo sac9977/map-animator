@@ -18,7 +18,9 @@ import { hexToRgba, getDefaultTrailColorForMode } from '../data/trailStyles';
  * continuously between whole pixels.
  */
 function projectSubpixel(map: L.Map, lat: number, lng: number): { x: number; y: number } {
-  const p = map.project(L.latLng(lat, lng));
+  // Container-space projection without latLngToContainerPoint's rounding:
+  // world pixels minus the map's pixel origin (measured = exactly its offset).
+  const p = map.project(L.latLng(lat, lng)).subtract(map.getPixelOrigin());
   return { x: p.x, y: p.y };
 }
 
