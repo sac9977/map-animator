@@ -81,18 +81,6 @@ export const MapViewport: React.FC<MapViewportProps> = ({
     redrawQueuedRef.current = true;
     requestAnimationFrame(() => {
       redrawQueuedRef.current = false;
-      const canvas = canvasRef.current;
-      // A leaflet-animated zoom leaves a CSS scale on the canvas (zoomanim).
-      // If a redraw then happens mid-flight (flyTo re-fires 'move' every
-      // frame, wheel, drag), the fresh content would composite through the
-      // stale scale+transition and the whole overlay visually shifts.
-      // Redraws are always in current container coordinates, so the
-      // transform must go before drawing. Pure 250ms zoom animations don't
-      // fire 'move' mid-flight, so they're untouched by this.
-      if (canvas && canvas.style.transform && canvas.style.transform !== 'none') {
-        canvas.style.transition = 'none';
-        canvas.style.transform = 'none';
-      }
       drawOverlayRef.current();
     });
   }, []);
@@ -116,8 +104,13 @@ export const MapViewport: React.FC<MapViewportProps> = ({
       center: [initialLat, initialLng],
       zoom: 8,
       zoomControl: false,
-      fadeAnimation: true,
-      zoomAnimation: true,
+      fadeAnimation: false,
+      // Atomic zoom state: with zoomAnimation off, every camera change lands
+      // in ONE epoch. The overlay canvas lives inside the map's overlay pane
+      // (see drawOverlay), so it shares every transform the tiles get and can
+      // never diverge from them — wheel/button zooms stop being animated, the
+      // same trade already made for the instant journey fit.
+      zoomAnimation: false,
       zoomAnimationThreshold: 8,
       zoomSnap: 0, // Continuous fractional zooming (removes jarring discrete integer snapping)
       zoomDelta: 0.5, // Smooth 0.5 step on zoom buttons
@@ -126,6 +119,15 @@ export const MapViewport: React.FC<MapViewportProps> = ({
     });
 
     L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+    const canvas = document.createElement('canvas');
+    canvas.style.display = 'block';
+    canvas.style.pointerEvents = 'none';
+    // The canvas is a child of the map's overlay pane: the browser applies
+    // the very same transform to tiles and to this canvas at composite time,
+    // so overlay and map can never be captured in different camera epochs.
+    map.getPanes().overlayPane.appendChild(canvas);
+    canvasRef.current = canvas;
 
     // Track user drag so auto-camera doesn't fight manual navigation
     map.on('dragstart', () => {
@@ -139,29 +141,6 @@ export const MapViewport: React.FC<MapViewportProps> = ({
       }, 1200);
     });
 
-    // Synchronize canvas hardware transform with Leaflet zoom animations
-    const handleZoomAnim = (e: L.ZoomAnimEvent) => {
-      const canvas = canvasRef.current;
-      if (!canvas || !mapRef.current) return;
-      const currentZoom = mapRef.current.getZoom();
-      const scale = mapRef.current.getZoomScale(e.zoom, currentZoom);
-      const origin = mapRef.current.latLngToContainerPoint(e.center);
-
-      canvas.style.transformOrigin = `${origin.x}px ${origin.y}px`;
-      canvas.style.transition = 'transform 0.25s cubic-bezier(0,0,0.25,1)';
-      canvas.style.transform = `scale(${scale})`;
-    };
-
-    const handleZoomEnd = () => {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      canvas.style.transition = 'none';
-      canvas.style.transform = 'none';
-      scheduleRedraw();
-    };
-
-    map.on('zoomanim', handleZoomAnim);
-    map.on('zoomend', handleZoomEnd);
     map.on('move', scheduleRedraw);
     map.on('resize', scheduleRedraw);
 
@@ -187,6 +166,7 @@ export const MapViewport: React.FC<MapViewportProps> = ({
       map.off('resize', scheduleRedraw);
       map.remove();
       mapRef.current = null;
+      canvasRef.current = null;
       setMapInstance(null);
     };
   }, []);
@@ -412,16 +392,29 @@ export const MapViewport: React.FC<MapViewportProps> = ({
     const size = map.getSize();
     const dpr = window.devicePixelRatio || 1;
 
+    // Anchor the canvas at the viewport's top-left in LAYER coordinates and
+    // translate the drawing context by the negative of that anchor: from here
+    // on, every projected point is a layer point, the same space projectSubpixel
+    // returns. The browser then moves the whole element with the map pane's
+    // transform — pixel-identical to what the tiles get (the L.Canvas
+    // renderer uses this exact scheme). If a fractional zoom is in effect the
+    // anchor is fractional; translate3d is subpixel-accurate (no rounding).
+    const anchor = map.containerPointToLayerPoint([0, 0]);
+    L.DomUtil.setPosition(canvas, anchor);
+
     if (canvas.width !== size.x * dpr || canvas.height !== size.y * dpr) {
       canvas.width = size.x * dpr;
       canvas.height = size.y * dpr;
       canvas.style.width = `${size.x}px`;
       canvas.style.height = `${size.y}px`;
+      // setting width/height resets the context this frame — fine, we set up
+      // the full transform below every draw.
     }
 
     ctx.save();
     ctx.scale(dpr, dpr);
-    ctx.clearRect(0, 0, size.x, size.y);
+    ctx.translate(-anchor.x, -anchor.y);
+    ctx.clearRect(anchor.x - 2, anchor.y - 2, size.x + 4, size.y + 4);
 
     // ----------------------------------------------------------------
     // Active sprite pose, computed ONCE per frame and shared by the
@@ -628,12 +621,6 @@ export const MapViewport: React.FC<MapViewportProps> = ({
       {activeTileStyle === 'cinematic-voyager' && (
         <div className="leaflet-cinematic-overlay-tint" />
       )}
-
-      {/* Transparent Canvas Animation Overlay */}
-      <canvas
-        ref={canvasRef}
-        className="absolute inset-0 pointer-events-none z-10"
-      />
 
       {/* Floating Weather / Climate Card */}
       <button
