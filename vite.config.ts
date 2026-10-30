@@ -11,6 +11,13 @@ export default defineConfig(() => {
       tailwindcss(),
       VitePWA({
         registerType: 'autoUpdate',
+        workbox: {
+          // Adopt new service workers immediately instead of the default
+          // two-reload dance; old precaches are then purged automatically.
+          skipWaiting: true,
+          clientsClaim: true,
+          cleanupOutdatedCaches: true,
+        },
         // No SW in dev: the dev SW caches unhashed modules, so code edits can
         // serve stale bundles forever (caused invisible transport icons).
         devOptions: {
