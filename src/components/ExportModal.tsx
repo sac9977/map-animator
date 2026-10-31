@@ -768,9 +768,8 @@ export const ExportModal: React.FC<ExportModalProps> = ({
         camCurrent = { ...routeCam };
       }
 
-      // Make sure this frame's native-level tiles have arrived before
-      // painting; a late arrival would otherwise be drawn from a coarse pass
-      // as huge upscaled pixels (blurry labels, visible seams).
+      // Kick off any camera-adjacent native-level tiles (cache-hit returns a
+      // settled promise, misses start a background load).
       const frameTileJobs: Promise<HTMLImageElement | null>[] = [];
       EXPORT_TILE_LAYERS.forEach((layer) => {
         const zL = levelFor(layer, camCurrent.zoom);
@@ -786,11 +785,12 @@ export const ExportModal: React.FC<ExportModalProps> = ({
       // cap uses an ordinary page timer — it must NOT go through the pacing
       // worker, where a canceled-looking 300 ms post from every frame would
       // spam the queue and instantly release later real pacing waits.
-      await Promise.race([
-        Promise.all(frameTileJobs),
-        new Promise((r) => setTimeout(r, 300)),
-      ]);
-
+      // Start any missing tiles loading, but never block the wall-clock
+      // pacing on them: a slow or rate-limited tile CDN used to stall the
+      // racing inline wait (0-300ms per frame) and produced an 8.96 fps
+      // capture with stretched timing. The coarse base coverage plus the
+      // cross-fade absorb a late fine tile instead.
+      void frameTileJobs;
       drawBasemap(camCurrent, frame);
 
       // Overlay geometry projected through the same camera transform
