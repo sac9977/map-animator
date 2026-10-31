@@ -158,13 +158,19 @@ export default function App() {
       if (activeLeg) {
         const legDuration = activeLeg.durationSeconds;
         // Dynamic Pacing Choreography (Item 10):
-        // Slow speed during start/end zoom phases, speeded up during transit
-        let speedFactor = playbackSpeed;
-        if (legProgress < 0.15 || legProgress > 0.85) {
-          speedFactor = playbackSpeed * 0.7; // Slow and cinematic near waypoints
-        } else {
-          speedFactor = playbackSpeed * 1.35; // Accelerated travel between legs
-        }
+        // Slow speed during start/end zoom phases, speeded up during transit.
+        // The two paces blend over a smoothstep window (±0.07 around the old
+        // 0.15/0.85 thresholds) — an instant 0.7↔1.35 switch lands mid
+        // departure/arrival sweep and reads as a camera jerk.
+        const smoothstep = (t: number) => {
+          const x = Math.min(1, Math.max(0, t));
+          return x * x * (3 - 2 * x);
+        };
+        const blend =
+          legProgress < 0.5
+            ? smoothstep((legProgress - 0.08) / 0.14)
+            : smoothstep((0.92 - legProgress) / 0.14);
+        const speedFactor = playbackSpeed * (0.7 + (1.35 - 0.7) * blend);
 
         const deltaProgress = (deltaMs / 1000 / legDuration) * speedFactor;
         const nextProgress = legProgress + deltaProgress;
