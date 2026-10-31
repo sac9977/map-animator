@@ -19,6 +19,8 @@ export interface Waypoint {
   lat: number;
   lng: number;
   country?: string;
+  /** Secondary place context for disambiguation (state/region/type), e.g. "Uttarakhand · town" */
+  detail?: string;
   airportCode?: string; // e.g. "JRO", "JFK"
   elevation?: number; // meters
 }

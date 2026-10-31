@@ -183,6 +183,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       lat: a.lat,
       lng: a.lng,
       country: a.country,
+      detail: a.name,
       airportCode: a.iata,
     }));
     const places = await searchPlaceOSM(query);
@@ -490,7 +491,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       }}
                       className="w-full text-left px-3 py-1.5 hover:bg-well text-xs flex items-center justify-between"
                     >
-                      <span className="font-medium text-ink truncate">{result.name}</span>
+                      <div className="min-w-0">
+                        <span className="font-medium text-ink truncate block">{result.name}</span>
+                        {(result.detail || result.country) && (
+                          <span className="text-[10px] text-ink3 truncate block">
+                            {[result.detail, result.country].filter(Boolean).join(' · ')}
+                          </span>
+                        )}
+                      </div>
                       {result.airportCode && (
                         <span className="text-xs bg-well text-accent font-mono px-1.5 py-0.5 rounded">
                           {result.airportCode}
@@ -848,11 +856,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     onClick={() => handleConfirmNewLeg(result)}
                     className="w-full text-left px-3 py-2 hover:bg-well text-xs flex items-center justify-between group transition-colors"
                   >
-                    <div>
-                      <span className="font-semibold text-ink block">{result.name}</span>
-                      {result.country && (
-                        <span className="text-xs text-ink3">{result.country}</span>
-                      )}
+                    <div className="min-w-0">
+                      <span className="font-semibold text-ink block truncate">{result.name}</span>
+                      <span className="text-xs text-ink3 truncate block">
+                        {[result.detail, result.country].filter(Boolean).join(' · ') || result.lat.toFixed(2) + '°, ' + result.lng.toFixed(2) + '°'}
+                      </span>
                     </div>
                     {result.airportCode && (
                       <span className="text-xs bg-well text-accent font-mono px-1.5 py-0.5 rounded">

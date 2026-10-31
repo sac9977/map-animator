@@ -121,12 +121,26 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   const [renderProgress, setRenderProgress] = useState(0);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const [useDynamicZoom, setUseDynamicZoom] = useState(true);
-  const [downloadFilename, setDownloadFilename] = useState<string>('');
+  const [downloadFilename, setDownloadFilename] = useState('');
+  // Bottom-screen overlays: both optional, fully user-styled. Empty custom
+  // title falls back to the classic "EXPEDITION JOURNEY · <home base>".
+  const [showTitle, setShowTitle] = useState(true);
+  const [titleText, setTitleText] = useState('');
+  const [titleColor, setTitleColor] = useState('#0A84FF');
+  const [showBrand, setShowBrand] = useState(true);
+  const [brandText, setBrandText] = useState('ANIMATED WITH MAPANIMATOR');
+  const [brandColor, setBrandColor] = useState('rgba(255, 255, 255, 0.72)');
+  const [fontChoice, setFontChoice] = useState<'system' | 'serif' | 'mono'>('system');
   const dialogRef = useModalA11y(isOpen, onClose);
 
   if (!isOpen) return null;
 
   const currentDims = RESOLUTION_DIMS[aspectRatio][resolution];
+  const FONT_STACKS: Record<typeof fontChoice, string> = {
+    system: '-apple-system, "SF Pro Display", system-ui, Helvetica, Arial, sans-serif',
+    serif: 'Georgia, "Times New Roman", serif',
+    mono: '"SF Mono", Menlo, Consolas, monospace',
+  };
 
   // Export the journey to video. The camera mirrors the map's Dynamic Zoom
   // choreography (damped follow-cam, close-ups at leg starts/stops, pulled
@@ -901,18 +915,26 @@ export const ExportModal: React.FC<ExportModalProps> = ({
         });
       }
 
-      // Title & Expedition Watermark (Apple brand: system blue + system font)
-      ctx.save();
-      ctx.shadowColor = 'rgba(0, 0, 0, 0.55)';
-      ctx.shadowBlur = 8;
-      ctx.fillStyle = '#0A84FF';
-      ctx.font = `600 ${Math.round(W * 0.022)}px -apple-system, "SF Pro Display", system-ui, "Helvetica Neue", Arial, sans-serif`;
-      ctx.fillText(`EXPEDITION JOURNEY · ${homeBase.name}`, 60, H - 70);
-
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.72)';
-      ctx.font = `500 ${Math.round(W * 0.012)}px -apple-system, "SF Pro Text", system-ui, "Helvetica Neue", Arial, sans-serif`;
-      ctx.fillText('ANIMATED WITH MAPANIMATOR', 60, H - 40);
-      ctx.restore();
+      // Title & brand watermark — both optional per user; text, colour and
+      // font family are user-styled. Empty title text falls back to the
+      // classic "EXPEDITION JOURNEY · <home base>".
+      if (showTitle || showBrand) {
+        const fam = FONT_STACKS[fontChoice];
+        ctx.save();
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.55)';
+        ctx.shadowBlur = 8;
+        if (showTitle) {
+          ctx.fillStyle = titleColor;
+          ctx.font = `600 ${Math.round(W * 0.022)}px ${fam}`;
+          ctx.fillText(titleText.trim() || `EXPEDITION JOURNEY · ${homeBase.name}`, 60, H - 70);
+        }
+        if (showBrand) {
+          ctx.fillStyle = brandColor;
+          ctx.font = `500 ${Math.round(W * 0.012)}px ${fam}`;
+          ctx.fillText(brandText, 60, H - 40);
+        }
+        ctx.restore();
+      }
 
       // This frame's pixels are final — hand them to the recorder now.
       captureTrack.requestFrame();
@@ -1112,6 +1134,105 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                 </span>
               </div>
             )}
+          </div>
+
+          {/* 5. Title & Watermark */}
+          <div>
+            <label className="text-xs font-bold text-accent block mb-2">
+              5. Title &amp; Watermark
+            </label>
+            <div className="space-y-2">
+              {/* Title line */}
+              <div className={`rounded-lg border p-3 space-y-2 ${showTitle ? 'border-hairline' : 'border-hairline opacity-60'}`}>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-ink">Expedition title</span>
+                  <button
+                    type="button"
+                    onClick={() => setShowTitle((v) => !v)}
+                    disabled={isRendering}
+                    aria-pressed={showTitle}
+                    className={`text-xs font-bold ${showTitle ? 'text-accent' : 'text-ink3'}`}
+                  >
+                    {showTitle ? 'ON' : 'OFF'}
+                  </button>
+                </div>
+                {showTitle && (
+                  <>
+                    <input
+                      type="text"
+                      value={titleText}
+                      disabled={isRendering}
+                      onChange={(e) => setTitleText(e.target.value)}
+                      placeholder="EXPEDITION JOURNEY · home base"
+                      aria-label="Expedition title text; leave empty to use the home base automatically"
+                      className="w-full text-xs px-2 py-1.5 rounded border border-hairline bg-well text-ink outline-none focus:border-accent"
+                    />
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={titleColor.startsWith('rgba') ? '#0a84ff' : titleColor}
+                        disabled={isRendering}
+                        onChange={(e) => setTitleColor(e.target.value)}
+                        aria-label="Title colour"
+                        className="w-7 h-7 rounded border border-hairline bg-well cursor-pointer"
+                      />
+                      <span className="text-[10px] text-ink3">Title colour</span>
+                    </div>
+                  </>
+                )}
+              </div>
+              {/* Brand line */}
+              <div className={`rounded-lg border border-hairline p-3 space-y-2 ${showBrand ? '' : 'opacity-60'}`}>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-ink">"Made with MapAnimator" line</span>
+                  <button
+                    type="button"
+                    onClick={() => setShowBrand((v) => !v)}
+                    disabled={isRendering}
+                    aria-pressed={showBrand}
+                    className={`text-xs font-bold ${showBrand ? 'text-accent' : 'text-ink3'}`}
+                  >
+                    {showBrand ? 'ON' : 'OFF'}
+                  </button>
+                </div>
+                {showBrand && (
+                  <>
+                    <input
+                      type="text"
+                      value={brandText}
+                      disabled={isRendering}
+                      onChange={(e) => setBrandText(e.target.value)}
+                      placeholder="ANIMATED WITH MAPANIMATOR"
+                      aria-label="Brand watermark text"
+                      className="w-full text-xs px-2 py-1.5 rounded border border-hairline bg-well text-ink outline-none focus:border-accent"
+                    />
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={brandColor.startsWith('rgba') ? '#b8b800' : brandColor}
+                        disabled={isRendering}
+                        onChange={(e) => setBrandColor(e.target.value)}
+                        aria-label="Brand watermark colour"
+                        className="w-7 h-7 rounded border border-hairline bg-well cursor-pointer"
+                      />
+                      <span className="text-[10px] text-ink3">Watermark colour</span>
+                    </div>
+                  </>
+                )}
+              </div>
+              {/* Shared font choice */}
+              <select
+                value={fontChoice}
+                disabled={isRendering}
+                onChange={(e) => setFontChoice(e.target.value as typeof fontChoice)}
+                aria-label="Caption font family"
+                className="text-xs px-2 py-1.5 rounded border border-hairline bg-surface text-ink outline-none focus:border-accent"
+              >
+                <option value="system">System font (SF Pro)</option>
+                <option value="serif">Serif (Georgia)</option>
+                <option value="mono">Monospace (Menlo)</option>
+              </select>
+            </div>
           </div>
 
           {/* Render Progress or Download Button */}

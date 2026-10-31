@@ -514,13 +514,25 @@ async function nominatimSearch(query: string): Promise<Waypoint[]> {
     });
     if (res.ok) {
       const items = await res.json();
-      return items.map((item: any) => ({
-        id: `osm-${item.place_id || Math.random().toString(36).substring(7)}`,
-        name: item.name || item.display_name.split(',')[0],
-        lat: parseFloat(item.lat),
-        lng: parseFloat(item.lon),
-        country: item.address?.country || '',
-      }));
+      return items.map((item: any) => {
+        const a = item.address || {};
+        // Disambiguation context: region-level info + OSM place type, since
+        // many search results share a name (cities, villages, stations, …).
+        const region = a.state || a.county || a.region || a.suburb || a.village || '';
+        const kind = item.type === 'aerodrome' ? 'airport'
+          : item.type === 'administrative' ? (a.state ? 'state' : 'district')
+          : item.type === 'subdivision' ? 'area'
+          : item.type;
+        const parts = [region, kind].filter(Boolean);
+        return {
+          id: `osm-${item.place_id || Math.random().toString(36).substring(7)}`,
+          name: item.name || item.display_name.split(',')[0],
+          lat: parseFloat(item.lat),
+          lng: parseFloat(item.lon),
+          country: a.country || '',
+          detail: parts.join(' · ') || undefined,
+        };
+      });
     }
   } catch (err) {
     console.warn('Nominatim geocode failed', err);

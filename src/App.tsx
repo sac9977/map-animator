@@ -82,10 +82,10 @@ const ClearJourneyConfirmModal: React.FC<{
 };
 
 export default function App() {
-  // Initial default to Tanzania Safari preset
-  const defaultPreset = PRESET_JOURNEYS[0];
-  const [homeBase, setHomeBase] = useState<Waypoint>(defaultPreset.homeBase);
-  const [legs, setLegs] = useState<JourneyLeg[]>(defaultPreset.legs);
+  // Blank start: no preset journeys auto-applied. The user picks their own
+  // home base and plots everything; Presets remain available in the menu.
+  const [homeBase, setHomeBase] = useState<Waypoint>({ id: 'home-blank', name: 'Set home base', lat: 20, lng: 0 });
+  const [legs, setLegs] = useState<JourneyLeg[]>([]);
 
   // Playback & Animation State
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
