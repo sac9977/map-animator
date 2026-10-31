@@ -719,7 +719,12 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     // Camera state (damped follow position + fractional zoom for the frame loop)
     let camCurrent: { lat: number; lng: number; zoom: number } = { ...routeCam };
 
-    const stream = canvas.captureStream(fps);
+    // captureStream(0) + explicit requestFrame(): a detached (never-in-DOM)
+    // canvas gets no compositor sampling, so captureStream(fps) delivered only
+    // a fraction of the drawn frames (~9 fps encoded despite 30 Hz pacing).
+    // Manual per-frame capture guarantees one encoded frame per draw.
+    const stream = canvas.captureStream(0);
+    const captureTrack = stream.getVideoTracks()[0] as CanvasCaptureMediaStreamTrack;
     const mimeType = MediaRecorder.isTypeSupported('video/mp4')
       ? 'video/mp4'
       : MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
@@ -908,6 +913,9 @@ export const ExportModal: React.FC<ExportModalProps> = ({
       ctx.font = `500 ${Math.round(W * 0.012)}px -apple-system, "SF Pro Text", system-ui, "Helvetica Neue", Arial, sans-serif`;
       ctx.fillText('ANIMATED WITH MAPANIMATOR', 60, H - 40);
       ctx.restore();
+
+      // This frame's pixels are final — hand them to the recorder now.
+      captureTrack.requestFrame();
 
       // Real-time pacing: MediaRecorder records wall-clock time, so the
       // renderer waits for each frame's true timestamp instead of racing.
