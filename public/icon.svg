@@ -1,130 +1,106 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
-  <!-- ============================================================
-       MapAnimator icon — EDITABLE MASTER
-       Canvas: 512x512, y grows DOWNWARD.
-       Geometry map (all coordinates in this 512x512 space):
-         • Origin waypoint (shared start of all 3 trails): (110, 402)
-         • Destination pin tip (shared end of all 3 trails): (396, 168)
-         • Road: straight line between those two points
-         • Flight + trek arcs: mirrors of each other around the road
-       After editing, regenerate every size from repo root:
-         cd public
-         for s in 512 192 180 48 32 16; do
-           rsvg-convert -w $s -h $s icon.svg -o "icon-$s.png"
-         done
-         mv icon-512.png pwa-512x512.png
-         mv icon-192.png pwa-192x192.png
-         mv icon-180.png apple-touch-icon.png
-         mv icon-48.png favicon-48.png
-         mv icon-32.png favicon-32.png
-         mv icon-16.png favicon-16.png
-       ============================================================ -->
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="512" height="512" viewBox="0 0 512 512">
   <defs>
-    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#10696C" />
-      <stop offset="55%" stop-color="#0E6466" />
-      <stop offset="100%" stop-color="#05302F" />
+    <linearGradient id="linear-gradient-1" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#10696c"/>
+      <stop offset="0.55" stop-color="#0e6466"/>
+      <stop offset="1" stop-color="#05302f"/>
     </linearGradient>
-    <radialGradient id="globe" cx="34%" cy="26%" r="85%">
-      <stop offset="0%" stop-color="#1B7D80" />
-      <stop offset="60%" stop-color="#0F676A" />
-      <stop offset="100%" stop-color="#083A3B" />
+    <radialGradient id="radial-gradient-1" cx="153.6" cy="112.64" r="409.6" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.12"/>
+      <stop offset="0.55" stop-color="#ffffff" stop-opacity="0"/>
     </radialGradient>
-    <linearGradient id="gold" x1="0%" y1="100%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#E8910B" />
-      <stop offset="100%" stop-color="#FBBF24" />
+    <filter id="filter-1" filterUnits="userSpaceOnUse" x="72" y="123.688" width="362" height="316.312" color-interpolation-filters="sRGB"><feGaussianBlur in="SourceAlpha" stdDeviation="8"/><feOffset dx="0" dy="6" result="shadow"/><feFlood flood-color="#021c1b" flood-opacity="0.45"/><feComposite in2="shadow" operator="in" result="paint"/><feMerge><feMergeNode in="paint"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="filter-2" filterUnits="userSpaceOnUse" x="94.344" y="143.516" width="109.864" height="106.966" color-interpolation-filters="sRGB"><feGaussianBlur in="SourceAlpha" stdDeviation="8"/><feOffset dx="-4.596" dy="3.857" result="shadow"/><feFlood flood-color="#021c1b" flood-opacity="0.45"/><feComposite in2="shadow" operator="in" result="paint"/><feMerge><feMergeNode in="paint"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="filter-3" filterUnits="userSpaceOnUse" x="73.5" y="131.5" width="359" height="311.328" color-interpolation-filters="sRGB"><feGaussianBlur in="SourceAlpha" stdDeviation="8"/><feOffset dx="0" dy="6" result="shadow"/><feFlood flood-color="#021c1b" flood-opacity="0.45"/><feComposite in2="shadow" operator="in" result="paint"/><feMerge><feMergeNode in="paint"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="filter-4" filterUnits="userSpaceOnUse" x="278.664" y="324.086" width="98.979" height="116.773" color-interpolation-filters="sRGB"><feGaussianBlur in="SourceAlpha" stdDeviation="8"/><feOffset dx="0" dy="6" result="shadow"/><feFlood flood-color="#021c1b" flood-opacity="0.45"/><feComposite in2="shadow" operator="in" result="paint"/><feMerge><feMergeNode in="paint"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="filter-5" filterUnits="userSpaceOnUse" x="71.5" y="129.5" width="363" height="311" color-interpolation-filters="sRGB"><feGaussianBlur in="SourceAlpha" stdDeviation="8"/><feOffset dx="0" dy="6" result="shadow"/><feFlood flood-color="#021c1b" flood-opacity="0.45"/><feComposite in2="shadow" operator="in" result="paint"/><feMerge><feMergeNode in="paint"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="filter-6" filterUnits="userSpaceOnUse" x="176.412" y="254.038" width="105.175" height="101.923" color-interpolation-filters="sRGB"><feGaussianBlur in="SourceAlpha" stdDeviation="8"/><feOffset dx="-4.663" dy="3.776" result="shadow"/><feFlood flood-color="#021c1b" flood-opacity="0.45"/><feComposite in2="shadow" operator="in" result="paint"/><feMerge><feMergeNode in="paint"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="filter-7" filterUnits="userSpaceOnUse" x="55.5" y="347.5" width="109" height="109" color-interpolation-filters="sRGB"><feGaussianBlur in="SourceAlpha" stdDeviation="8"/><feOffset dx="0" dy="6" result="shadow"/><feFlood flood-color="#021c1b" flood-opacity="0.45"/><feComposite in2="shadow" operator="in" result="paint"/><feMerge><feMergeNode in="paint"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="filter-8" filterUnits="userSpaceOnUse" x="334.5" y="116.5" width="109" height="109" color-interpolation-filters="sRGB"><feGaussianBlur in="SourceAlpha" stdDeviation="8"/><feOffset dx="0" dy="6" result="shadow"/><feFlood flood-color="#021c1b" flood-opacity="0.45"/><feComposite in2="shadow" operator="in" result="paint"/><feMerge><feMergeNode in="paint"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="filter-9" filterUnits="userSpaceOnUse" x="325.5" y="67.5" width="127" height="141.5" color-interpolation-filters="sRGB"><feGaussianBlur in="SourceAlpha" stdDeviation="8"/><feOffset dx="0" dy="6" result="shadow"/><feFlood flood-color="#021c1b" flood-opacity="0.45"/><feComposite in2="shadow" operator="in" result="paint"/><feMerge><feMergeNode in="paint"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <linearGradient id="linear-gradient-2" x1="359" y1="171" x2="428.176" y2="111.706" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#e8910b"/>
+      <stop offset="1" stop-color="#fbbf24"/>
     </linearGradient>
-    <radialGradient id="glow" cx="30%" cy="22%" r="80%">
-      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.12" />
-      <stop offset="55%" stop-color="#FFFFFF" stop-opacity="0" />
-    </radialGradient>
-    <filter id="soft" x="-40%" y="-40%" width="180%" height="180%">
-      <feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#021C1B" flood-opacity="0.45" />
-    </filter>
   </defs>
-
-  <!-- ================= TITLE ================= -->
-  <g id="tile">
-    <rect width="512" height="512" rx="116" fill="url(#bg)" />
-    <rect width="512" height="512" rx="116" fill="url(#glow)" />
-  </g>
-
-  <!-- ================= GLOBE BACKDROP ================= -->
-  <!-- Delete this whole <g> for a plain background.
-       Center (256,268), radius 210. Meridians are ellipses, parallels are lines. -->
-  <g id="globe">
-    <circle cx="256" cy="268" r="210" fill="url(#globe)" />
-    <g fill="none" stroke="#F4F1EA">
-      <circle cx="256" cy="268" r="210" stroke-opacity="0.28" stroke-width="3" />
-      <ellipse cx="256" cy="268" rx="70"  ry="210" stroke-opacity="0.14" stroke-width="2.5" />
-      <ellipse cx="256" cy="268" rx="140" ry="210" stroke-opacity="0.14" stroke-width="2.5" />
-      <line x1="62" y1="188" x2="450" y2="188" stroke-opacity="0.14" stroke-width="2.5" />
-      <line x1="46" y1="268" x2="466" y2="268" stroke-opacity="0.18" stroke-width="2.5" />
-      <line x1="62" y1="348" x2="450" y2="348" stroke-opacity="0.14" stroke-width="2.5" />
-    </g>
-  </g>
-
-  <!-- ================= TRAIL 1: ROAD (center, straight) ================= -->
-  <g id="trail-road">
-    <path id="road-line" d="M 110 402 L 396 168" fill="none"
-          stroke="#F4F1EA" stroke-width="13" stroke-linecap="round" filter="url(#soft)" />
-    <path id="road-dashes" d="M 110 402 L 396 168" fill="none"
-          stroke="#0E6466" stroke-opacity="0.5" stroke-width="2.5" stroke-dasharray="10 12" />
-    <!-- Car: top view, front = up. rotate() aims it along the road.
-         First translate() value pair = position on the road. -->
-    <g id="car" transform="translate(253,285) rotate(51)" filter="url(#soft)">
-      <rect x="-11" y="-22" width="22" height="44" rx="7" fill="#FFFFFF" stroke="#F4F1EA" stroke-width="1.5" />
-      <rect x="-8.5" y="-6" width="17" height="15" rx="3" fill="#0E6466" opacity="0.8" />
-      <rect x="-7.5" y="16" width="15" height="6" rx="2.5" fill="#0E6466" opacity="0.45" />
-    </g>
-  </g>
-
-  <!-- ================= TRAIL 2: FLIGHT (bowing up-left) ================= -->
-  <g id="trail-flight">
-    <path id="flight-arc" d="M 110 402 C 121 221 216 137 396 168" fill="none"
-          stroke="url(#gold)" stroke-width="12" stroke-linecap="round" stroke-dasharray="24 14" filter="url(#soft)" />
-    <!-- Airliner: nose = up before rotate(). scale 2.6 = size. -->
-    <g id="plane" transform="translate(190,208) rotate(50)" filter="url(#soft)">
-      <g transform="scale(2.6) translate(-11.5,-12)" fill="#FFFFFF" stroke="#F4F1EA" stroke-width="0.6">
-        <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/>
+  <title>icon.svg</title>
+  <g id="Layer_1" data-name="Layer 1">
+    <g>
+      <g id="tile">
+        <path d="M116 0 L396 0 C460.065 0 512 51.935 512 116 L512 396 C512 460.065 460.065 512 396 512 L116 512 C51.935 512 0 460.065 0 396 L0 116 C0 51.935 51.935 0 116 0 Z" fill="url(#linear-gradient-1)"/>
+        <path d="M116 0 L396 0 C460.065 0 512 51.935 512 116 L512 396 C512 460.065 460.065 512 396 512 L116 512 C51.935 512 0 460.065 0 396 L0 116 C0 51.935 51.935 0 116 0 Z" fill="url(#radial-gradient-1)"/>
+      </g>
+      <g id="globe">
+        <g>
+          <circle cx="256" cy="268" r="210" fill="none" stroke="#f4f1ea" stroke-opacity="0.28" stroke-width="3"/>
+          <ellipse cx="256" cy="268" rx="70" ry="210" fill="none" stroke="#f4f1ea" stroke-opacity="0.14" stroke-width="2.5"/>
+          <ellipse cx="256" cy="268" rx="140" ry="210" fill="none" stroke="#f4f1ea" stroke-opacity="0.14" stroke-width="2.5"/>
+          <line x1="62" y1="188" x2="450" y2="188" fill="none" stroke="#f4f1ea" stroke-opacity="0.14" stroke-width="2.5"/>
+          <line x1="46" y1="268" x2="466" y2="268" fill="none" stroke="#f4f1ea" stroke-opacity="0.18" stroke-width="2.5"/>
+          <line x1="62" y1="348" x2="450" y2="348" fill="none" stroke="#f4f1ea" stroke-opacity="0.14" stroke-width="2.5"/>
+        </g>
+      </g>
+      <g id="trail-flight">
+        <g filter="url(#filter-1)">
+          <path id="flight-arc" d="M110 402 C121 221 216 137 396 168" fill="none" stroke="#ffffff" stroke-width="12" stroke-linecap="round" stroke-dasharray="24 14"/>
+        </g>
+        <g filter="url(#filter-2)">
+          <g id="plane">
+            <path d="M159.91 218.606 L163.893 215.264 L160.482 190.974 L171.436 181.782 C173.09 180.395 173.304 177.941 171.917 176.288 C170.53 174.634 168.076 174.42 166.423 175.807 L155.468 184.999 L132.14 177.421 L128.156 180.764 L146.506 192.519 L135.551 201.711 L129.221 200.235 L126.233 202.741 L134.075 208.041 L137.932 216.683 L140.92 214.177 L140.565 207.686 L151.519 198.494 Z" fill="#ffffff" stroke="#f4f1ea" stroke-width="1.56"/>
+          </g>
+        </g>
+      </g>
+      <g id="trail-trek">
+        <g filter="url(#filter-3)">
+          <path id="trek-rings-outer" d="M110 402 C290 427 385 343 396 168" fill="none" stroke="#f4f1ea" stroke-opacity="0.9" stroke-width="9" stroke-linecap="round" stroke-dasharray="1 13"/>
+        </g>
+        <path id="trek-rings-inner" d="M110 402 C290 427 385 343 396 168" fill="none" stroke="#0e6466" stroke-opacity="0.85" stroke-width="3.2" stroke-linecap="round" stroke-dasharray="1 13"/>
+        <g filter="url(#filter-4)">
+          <g id="footprints">
+            <g id="footprint-back">
+              <path d="M337.836 394.106 C334.06 397.275 329.042 397.511 326.628 394.634 C324.214 391.757 325.318 386.856 329.094 383.688 C332.87 380.52 337.888 380.283 340.302 383.16 C342.716 386.037 341.612 390.938 337.836 394.106 Z" fill="#ffffff" stroke="#0e6466" stroke-opacity="0.4" stroke-width="2.125"/>
+              <path d="M320.191 406.138 C317.674 408.25 314.288 408.359 312.628 406.381 C310.969 404.403 311.664 401.087 314.181 398.975 C316.699 396.863 320.085 396.754 321.744 398.732 C323.404 400.71 322.709 404.025 320.191 406.138 Z" fill="#ffffff" stroke="#0e6466" stroke-opacity="0.4" stroke-width="2.125"/>
+            </g>
+            <g id="footprint-front">
+              <path d="M340.836 370.106 C337.06 373.275 332.042 373.511 329.628 370.634 C327.214 367.757 328.318 362.856 332.094 359.688 C335.87 356.52 340.888 356.283 343.302 359.16 C345.716 362.037 344.612 366.938 340.836 370.106 Z" fill="#ffffff" stroke="#0e6466" stroke-opacity="0.4" stroke-width="2.125"/>
+              <path d="M323.191 382.138 C320.674 384.25 317.288 384.359 315.628 382.381 C313.969 380.403 314.664 377.087 317.181 374.975 C319.699 372.863 323.085 372.754 324.744 374.732 C326.404 376.71 325.709 380.025 323.191 382.138 Z" fill="#ffffff" stroke="#0e6466" stroke-opacity="0.4" stroke-width="2.125"/>
+            </g>
+          </g>
+        </g>
+      </g>
+      <g id="trail-road">
+        <g filter="url(#filter-5)">
+          <line id="road-line" x1="110" y1="402" x2="396" y2="168" fill="none" stroke="#f4f1ea" stroke-width="13" stroke-linecap="round"/>
+        </g>
+        <line id="road-dashes" x1="110" y1="402" x2="396" y2="168" fill="none" stroke="#0e6466" stroke-opacity="0.5" stroke-width="2.5" stroke-dasharray="10 12"/>
+        <g filter="url(#filter-6)">
+          <g id="car">
+            <path d="M243.58 288.046 L248.614 294.264 C251.047 297.268 250.584 301.676 247.58 304.109 L224.265 322.988 C221.261 325.421 216.853 324.958 214.42 321.954 L209.386 315.736 C206.953 312.732 207.416 308.324 210.42 305.891 L233.735 287.012 C236.739 284.579 241.147 285.042 243.58 288.046 Z" fill="#ffffff" stroke="#f4f1ea" stroke-width="1.5"/>
+            <path d="M230.202 296.95 L237.124 305.498 C238.167 306.786 237.968 308.675 236.681 309.718 L229.686 315.382 C228.399 316.424 226.51 316.226 225.467 314.938 L218.544 306.39 C217.502 305.102 217.7 303.213 218.988 302.17 L225.982 296.506 C227.27 295.464 229.159 295.662 230.202 296.95 Z" fill="#0e6466" opacity="0.8"/>
+            <path d="M213.419 311.183 L219.712 318.955 C220.581 320.028 220.416 321.602 219.343 322.471 L218.566 323.1 C217.493 323.969 215.918 323.804 215.049 322.731 L208.756 314.959 C207.887 313.886 208.053 312.312 209.126 311.443 L209.903 310.814 C210.976 309.945 212.55 310.11 213.419 311.183 Z" fill="#0e6466" opacity="0.45"/>
+          </g>
+        </g>
+      </g>
+      <g filter="url(#filter-7)">
+        <g id="origin">
+          <circle cx="110" cy="402" r="19" fill="#f4f1ea" stroke="#0e6466" stroke-width="7"/>
+          <circle cx="110" cy="402" r="7" fill="#f59e0b"/>
+        </g>
+      </g>
+      <g filter="url(#filter-8)">
+        <g id="origin-2" data-name="origin">
+          <circle cx="389" cy="171" r="19" fill="#f4f1ea" stroke="#0e6466" stroke-width="7"/>
+          <circle cx="389" cy="171" r="7" fill="#f59e0b"/>
+        </g>
+      </g>
+      <g filter="url(#filter-9)">
+        <g id="pin">
+          <ellipse cx="389" cy="171" rx="16" ry="6" fill="#021c1b" opacity="0.35"/>
+          <path d="M389 101 C372.5 101 359 114.5 359 131 C359 153 389 171 389 171 C389 171 419 153 419 131 C419 114.5 405.5 101 389 101 Z" fill="url(#linear-gradient-2)" stroke="#b45309" stroke-width="3"/>
+          <circle cx="389" cy="130" r="10.5" fill="#f4f1ea"/>
+        </g>
       </g>
     </g>
-  </g>
-
-  <!-- ================= TRAIL 3: TREK (bowing down-right) ================= -->
-  <g id="trail-trek">
-    <!-- Hollow "stepping stone" rings: 2st stroke punches a hole in the 1st -->
-    <path id="trek-rings-outer" d="M 110 402 C 290 427 385 343 396 168" fill="none"
-          stroke="#F4F1EA" stroke-opacity="0.9" stroke-width="9" stroke-linecap="round" stroke-dasharray="1 13" filter="url(#soft)" />
-    <path id="trek-rings-inner" d="M 110 402 C 290 427 385 343 396 168" fill="none"
-          stroke="#0E6466" stroke-opacity="0.85" stroke-width="3.2" stroke-linecap="round" stroke-dasharray="1 13" />
-    <!-- Footprints: sit ~32px OUTSIDE (down-right of) the trek curve.
-         Each print = toe pad + heel pad, drawn pointing UP, then rotate(50)
-         aims the toes along the direction of travel. scale(0.85) = size. -->
-    <g id="footprints" fill="#FFFFFF" stroke="#0E6466" stroke-opacity="0.4" stroke-width="2.5" filter="url(#soft)">
-      <g id="footprint-back"  transform="translate(325,396) rotate(50) scale(0.85)">
-        <ellipse cx="0" cy="-13" rx="8" ry="10.5" />
-        <ellipse cx="0" cy="12"  rx="5.5" ry="7" />
-      </g>
-      <g id="footprint-front" transform="translate(348,377) rotate(50) scale(0.85)">
-        <ellipse cx="0" cy="-13" rx="8" ry="10.5" />
-        <ellipse cx="0" cy="12"  rx="5.5" ry="7" />
-      </g>
-    </g>
-  </g>
-
-  <!-- ================= SHARED ORIGIN WAYPOINT ================= -->
-  <g id="origin" filter="url(#soft)">
-    <circle cx="110" cy="402" r="19" fill="#F4F1EA" stroke="#0E6466" stroke-width="7" />
-    <circle cx="110" cy="402" r="7" fill="#F59E0B" />
-  </g>
-
-  <!-- ================= DESTINATION PIN ================= -->
-  <!-- The +40 in the tip (0,40) below is what the trails aim at (396,168). -->
-  <g id="pin" transform="translate(396,128)" filter="url(#soft)">
-    <ellipse cx="0" cy="40" rx="16" ry="6" fill="#021C1B" opacity="0.35" />
-    <path d="M 0 -30 C -16.5 -30 -30 -16.5 -30 0 C -30 22 0 40 0 40 C 0 40 30 22 30 0 C 30 -16.5 16.5 -30 0 -30 Z"
-          fill="url(#gold)" stroke="#B45309" stroke-width="3" />
-    <circle cx="0" cy="-1" r="10.5" fill="#F4F1EA" />
   </g>
 </svg>
