@@ -502,38 +502,57 @@ export async function searchPlaceOSM(query: string): Promise<Waypoint[]> {
 }
 
 async function nominatimSearch(query: string): Promise<Waypoint[]> {
-  const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+  const base = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
     query
-  )}&limit=6&addressdetails=1`;
+  )}&limit=4&addressdetails=1`;
+
+  const mapItems = (items: any[]): Waypoint[] =>
+    items.map((item: any) => {
+      const a = item.address || {};
+      // Disambiguation context: region-level info + OSM place type, since
+      // many search results share a name (cities, villages, stations, …).
+      const region = a.state || a.county || a.region || a.suburb || a.village || '';
+      const kind = item.type === 'aerodrome' ? 'airport'
+        : item.type === 'administrative' ? (a.state_district || a.county ? 'district' : 'state')
+        : item.type === 'subdivision' ? 'area'
+        : item.type;
+      const parts = [region, kind].filter(Boolean);
+      return {
+        id: `osm-${item.place_id || Math.random().toString(36).substring(7)}`,
+        name: item.name || item.display_name.split(',')[0],
+        lat: parseFloat(item.lat),
+        lng: parseFloat(item.lon),
+        country: a.country || '',
+        detail: parts.join(' · ') || undefined,
+      };
+    });
 
   try {
-    const res = await fetch(url, {
-      headers: {
-        'Accept-Language': 'en',
-      },
+    // Importance ranking hides smaller places sharing a name with a bigger
+    // one (e.g. "Uttarkashi" town is buried by the district boundary), so
+    // run a second, settlement-only query and merge — settlements first,
+    // since travelers usually want the town itself.
+    const [plain, cities] = await Promise.all(
+      [
+        fetch(base, { headers: { 'Accept-Language': 'en' } }),
+        fetch(`${base}&featureType=city`, { headers: { 'Accept-Language': 'en' } }),
+      ].map(async (p) => {
+        const res = await p;
+        return res.ok ? mapItems(await res.json()) : [];
+      })
+    );
+
+    const seen = new Set<string>();
+    return [...cities, ...plain].filter((w) => {
+      if (seen.has(w.id)) return false;
+      // Two results at the same spot (boundary + town) are one place to
+      // a traveler; keep the first, which is the settlement voice.
+      const spot = `${w.lat.toFixed(3)},${w.lng.toFixed(3)}`;
+      if (seen.has(spot)) return false;
+      seen.add(w.id);
+      seen.add(spot);
+      return true;
     });
-    if (res.ok) {
-      const items = await res.json();
-      return items.map((item: any) => {
-        const a = item.address || {};
-        // Disambiguation context: region-level info + OSM place type, since
-        // many search results share a name (cities, villages, stations, …).
-        const region = a.state || a.county || a.region || a.suburb || a.village || '';
-        const kind = item.type === 'aerodrome' ? 'airport'
-          : item.type === 'administrative' ? (a.state ? 'state' : 'district')
-          : item.type === 'subdivision' ? 'area'
-          : item.type;
-        const parts = [region, kind].filter(Boolean);
-        return {
-          id: `osm-${item.place_id || Math.random().toString(36).substring(7)}`,
-          name: item.name || item.display_name.split(',')[0],
-          lat: parseFloat(item.lat),
-          lng: parseFloat(item.lon),
-          country: a.country || '',
-          detail: parts.join(' · ') || undefined,
-        };
-      });
-    }
   } catch (err) {
     console.warn('Nominatim geocode failed', err);
   }
