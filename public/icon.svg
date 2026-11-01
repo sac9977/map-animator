@@ -1,37 +1,65 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
   <defs>
     <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#0E6466" />
-      <stop offset="100%" stop-color="#063233" />
+      <stop offset="0%" stop-color="#10696C" />
+      <stop offset="55%" stop-color="#0E6466" />
+      <stop offset="100%" stop-color="#05302F" />
     </linearGradient>
-    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#FBBF24" />
-      <stop offset="100%" stop-color="#D97706" />
+    <linearGradient id="gold" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#E8910B" />
+      <stop offset="100%" stop-color="#FBBF24" />
     </linearGradient>
+    <radialGradient id="glow" cx="30%" cy="22%" r="80%">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.14" />
+      <stop offset="55%" stop-color="#FFFFFF" stop-opacity="0" />
+    </radialGradient>
+    <filter id="soft" x="-40%" y="-40%" width="180%" height="180%">
+      <feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#021C1B" flood-opacity="0.45" />
+    </filter>
   </defs>
-  <!-- Background with rounded squircle -->
-  <rect width="512" height="512" rx="128" fill="url(#bg)" />
-  
-  <!-- Subtle topographic contour rings -->
-  <circle cx="256" cy="256" r="180" fill="none" stroke="#FFFFFF" stroke-opacity="0.08" stroke-width="4" stroke-dasharray="12 12" />
-  <circle cx="256" cy="256" r="120" fill="none" stroke="#FFFFFF" stroke-opacity="0.12" stroke-width="4" />
-  
-  <!-- Curved travel route path -->
-  <path d="M 120 370 Q 220 180 380 150" fill="none" stroke="url(#gold)" stroke-width="14" stroke-linecap="round" stroke-dasharray="24 16" />
-  
-  <!-- Start waypoint pin -->
-  <circle cx="120" cy="370" r="18" fill="#F4F1EA" stroke="#0E6466" stroke-width="6" />
-  <circle cx="120" cy="370" r="8" fill="#F59E0B" />
-  
-  <!-- Airplane icon along route -->
-  <g transform="translate(260, 230) rotate(-28)">
-    <path d="M 0 -35 L 8 -12 L 40 4 L 40 14 L 8 4 L 6 26 L 18 36 L 18 42 L 0 36 L -18 42 L -18 36 L -6 26 L -8 4 L -40 14 L -40 4 L -8 -12 Z" fill="#FFFFFF" />
+
+  <!-- Squircle tile -->
+  <rect width="512" height="512" rx="116" fill="url(#bg)" />
+  <rect width="512" height="512" rx="116" fill="url(#glow)" />
+
+  <!-- Faint topographic contour rings -->
+  <g fill="none" stroke="#F4F1EA">
+    <circle cx="150" cy="405" r="150" stroke-opacity="0.07" stroke-width="3" stroke-dasharray="3 10" />
+    <circle cx="150" cy="405" r="105" stroke-opacity="0.09" stroke-width="3" />
+    <circle cx="150" cy="405" r="63" stroke-opacity="0.07" stroke-width="3" stroke-dasharray="16 8" />
+    <circle cx="415" cy="105" r="88" stroke-opacity="0.08" stroke-width="3" stroke-dasharray="3 10" />
   </g>
-  
-  <!-- End waypoint destination pin -->
-  <g transform="translate(380, 150)">
-    <circle cx="0" cy="0" r="22" fill="#F59E0B" />
-    <path d="M 0 -24 C -13 -24 -24 -13 -24 0 C -24 18 0 38 0 38 C 0 38 24 18 24 0 C 24 -13 13 -24 0 -24 Z" fill="#F59E0B" />
-    <circle cx="0" cy="0" r="8" fill="#FFFFFF" />
+
+  <!-- Grid meridian ticks (map feel) -->
+  <g stroke="#F4F1EA" stroke-opacity="0.14" stroke-width="2">
+    <line x1="0" y1="170" x2="512" y2="158" />
+    <line x1="0" y1="330" x2="512" y2="322" />
+    <line x1="170" y1="0" x2="166" y2="512" />
+    <line x1="352" y1="0" x2="356" y2="512" />
+  </g>
+
+  <!-- Travel route: out-and-back geodesic pair -->
+  <g filter="url(#soft)">
+    <path d="M 96 396 C 210 330 300 260 386 158" fill="none" stroke="url(#gold)" stroke-width="13" stroke-linecap="round" stroke-dasharray="26 15" />
+    <path d="M 118 420 C 230 380 320 320 396 210" fill="none" stroke="#FBBF24" stroke-opacity="0.30" stroke-width="7" stroke-linecap="round" stroke-dasharray="2 14" />
+  </g>
+
+  <!-- Origin waypoint -->
+  <g filter="url(#soft)">
+    <circle cx="96" cy="396" r="19" fill="#F4F1EA" stroke="#0E6466" stroke-width="7" />
+    <circle cx="96" cy="396" r="7" fill="#F59E0B" />
+  </g>
+
+  <!-- Airplane along the route -->
+  <g transform="translate(252, 272) rotate(-42)" filter="url(#soft)">
+    <path d="M 0 -46 L 6.5 -20 C 30 -8 44 0 44 8 L 10 8 L 8 34 L 22 46 L 22 53 L 0 45 L -22 53 L -22 46 L -8 34 L -10 8 L -44 8 L -44 0 C -30 -8 -6.5 -20 0 -46 Z"
+          fill="#FFFFFF" stroke="#F4F1EA" stroke-width="2" />
+  </g>
+
+  <!-- Destination pin -->
+  <g transform="translate(396, 128)" filter="url(#soft)">
+    <ellipse cx="0" cy="40" rx="16" ry="6" fill="#021C1B" opacity="0.35" />
+    <path d="M 0 -30 C -16.5 -30 -30 -16.5 -30 0 C -30 22 0 40 0 40 C 0 40 30 22 30 0 C 30 -16.5 16.5 -30 0 -30 Z" fill="url(#gold)" stroke="#B45309" stroke-width="3" />
+    <circle cx="0" cy="-1" r="10.5" fill="#F4F1EA" />
   </g>
 </svg>
