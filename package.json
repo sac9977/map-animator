@@ -12,7 +12,7 @@
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
-    "dist:mac": "vite build --base ./ && electron-builder --mac dmg",
+    "dist:mac": "vite build --base ./ && APPLE_KEYCHAIN_PROFILE=AC_PASSWORD electron-builder --mac dmg",
     "dist:win": "vite build --base ./ && electron-builder --win nsis",
     "dist": "vite build --base ./ && electron-builder --mac dmg --win nsis"
   },
@@ -28,7 +28,10 @@
     ],
     "mac": {
       "icon": "public/pwa-512x512.png",
-      "identity": null
+      "identity": "Sachin Kadam",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "notarize": true
     },
     "win": {
       "icon": "public/pwa-512x512.png",
